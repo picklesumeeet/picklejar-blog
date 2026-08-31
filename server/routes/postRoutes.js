@@ -1,0 +1,28 @@
+import express from 'express';
+const router = express.Router();
+import { getPosts, getPost, createPost, updatePost, deletePost, searchPosts } from '../controllers/postController.js';
+import { protect } from '../middleware/authMiddleware.js';
+import role from '../middleware/roleMiddleware.js';
+import optionalAuth from '../middleware/optionalAuth.js';
+import { validate } from '../middleware/validateMiddleware.js';
+import { postSchema } from '../validators/postValidator.js';
+
+router.route('/').get(optionalAuth, getPosts).post(protect, role(['admin', 'editor']), validate(postSchema), createPost);
+router.route('/search').get(searchPosts);
+router.route('/:slug').get(optionalAuth, getPost);
+router.route('/:id')
+  .put(protect, role(['admin', 'editor']), validate(postSchema), updatePost)
+  .delete(protect, role(['admin', 'editor']), deletePost);
+
+router.route('/:id/send-newsletter').post(protect, role(['admin', 'editor']), (async (req, res, next) => {
+  const { sendNewsletter } = await import('../controllers/postController.js');
+  sendNewsletter(req, res, next);
+}));
+
+router.route('/:id/ad-slots').patch(protect, role(['admin']), (async (req, res, next) => {
+  const { updateAdSlots } = await import('../controllers/postController.js');
+  updateAdSlots(req, res, next);
+}));
+
+
+export default router;
