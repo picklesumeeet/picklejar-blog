@@ -9,7 +9,7 @@ export default function PostMeta({ category, date, author, className = '' }) {
       {date && (
         <>
           {category && <span className="text-[var(--line)]">•</span>}
-          <span className="text-[var(--gray-2)]">{new Date(date).toLocaleDateString()}</span>
+          <span className="text-[var(--gray-2)]">{new Date(date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </>
       )}
       {author && (
