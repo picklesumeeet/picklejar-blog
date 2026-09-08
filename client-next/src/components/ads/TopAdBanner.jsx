@@ -2,24 +2,39 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import axios from '../../api/axios';
+import { createClient } from '@/lib/supabase/client';
+import { mapAd } from '@/lib/supabase/mappers';
 import { optimizeCloudinaryUrl } from '../../utils/optimizeCloudinaryUrl';
 
 export default function TopAdBanner() {
   const [ad, setAd] = useState(null);
 
   useEffect(() => {
-    const fetchAd = async () => {
-      try {
-        const res = await axios.get('/ads?placement=top-banner&active=true&limit=1');
-        if (res.data.success && res.data.data.length > 0) {
-          setAd(res.data.data[0]);
-        }
-      } catch (err) {
-        console.error('Failed to load top banner ad:', err);
+    const supabase = createClient();
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('ads')
+        .select('*')
+        .eq('placement', 'top_banner')
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      if (error) {
+        console.error('Failed to load top banner ad:', error);
+        return;
       }
-    };
-    fetchAd();
+      // Date-window filter in JS — Supabase's `.or()` chaining is awkward for
+      // "column-is-null OR column-<comparison>" pairs across two columns.
+      const now = new Date();
+      const winner = (data || []).find(a =>
+        (!a.start_date || new Date(a.start_date) <= now) &&
+        (!a.end_date   || new Date(a.end_date)   >= now)
+      );
+      if (winner) setAd(mapAd(winner));
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   return (

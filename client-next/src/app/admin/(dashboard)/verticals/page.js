@@ -1,8 +1,13 @@
 "use client";
 import { useState, useEffect, useContext } from 'react';
-import axios from "@/api/axios";
+import { createClient } from '@/lib/supabase/client';
+import { mapVertical } from '@/lib/supabase/mappers';
 import { AuthContext } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
+
+function slugify(name) {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
 
 export default function ManageVerticals() {
   const { user: currentUser } = useContext(AuthContext);
@@ -11,7 +16,7 @@ export default function ManageVerticals() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
-  
+
   const [formData, setFormData] = useState({
     name: '',
     active: true,
@@ -27,12 +32,16 @@ export default function ManageVerticals() {
     try {
       setLoading(true);
       setError('');
-      const res = await axios.get('/verticals');
-      if (res.data.success) {
-        setVerticals(res.data.data);
-      }
+      const supabase = createClient();
+      const { data, error: err } = await supabase
+        .from('verticals')
+        .select('*')
+        .order('featured_order')
+        .order('created_at', { ascending: false });
+      if (err) throw err;
+      setVerticals((data ?? []).map(mapVertical));
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load verticals');
+      setError(err.message || 'Failed to load verticals');
     } finally {
       setLoading(false);
     }
@@ -41,9 +50,9 @@ export default function ManageVerticals() {
   const handleEditClick = (vertical) => {
     setIsEditing(true);
     setEditingId(vertical._id);
-    setFormData({ 
-      name: vertical.name, 
-      active: vertical.active, 
+    setFormData({
+      name: vertical.name,
+      active: vertical.active,
       featured: vertical.featured || false,
       featuredOrder: vertical.featuredOrder || 1
     });
@@ -64,19 +73,25 @@ export default function ManageVerticals() {
     }
     try {
       setError('');
-      const res = await axios.delete(`/verticals/${id}`);
-      if (res.data.success) {
-        fetchVerticals();
+      const supabase = createClient();
+      const { error: err } = await supabase.from('verticals').delete().eq('id', id);
+      if (err) {
+        // 23503 = foreign_key_violation; happens when posts still reference this vertical.
+        if (err.code === '23503') {
+          throw new Error('Cannot delete — posts still reference this vertical.');
+        }
+        throw err;
       }
+      fetchVerticals();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete vertical');
+      setError(err.message || 'Failed to delete vertical');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     if (!formData.name.trim()) {
       setError('Name is required');
       return;
@@ -91,21 +106,31 @@ export default function ManageVerticals() {
     }
 
     try {
+      const supabase = createClient();
+      const payload = {
+        name: formData.name.trim(),
+        slug: slugify(formData.name),
+        active: formData.active,
+        featured: formData.featured,
+        featured_order: formData.featuredOrder,
+      };
+
       if (editingId) {
-        const res = await axios.put(`/verticals/${editingId}`, formData);
-        if (res.data.success) {
-          handleCancel();
-          fetchVerticals();
-        }
+        const { error: err } = await supabase.from('verticals').update(payload).eq('id', editingId);
+        if (err) throw err;
       } else {
-        const res = await axios.post('/verticals', formData);
-        if (res.data.success) {
-          handleCancel();
-          fetchVerticals();
-        }
+        const { error: err } = await supabase.from('verticals').insert(payload);
+        if (err) throw err;
       }
+      handleCancel();
+      fetchVerticals();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save vertical');
+      // 23505 = unique_violation (duplicate slug)
+      if (err.code === '23505') {
+        setError('A vertical with this slug already exists — pick a different name.');
+      } else {
+        setError(err.message || 'Failed to save vertical');
+      }
     }
   };
 
@@ -125,8 +150,8 @@ export default function ManageVerticals() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold font-heading text-[var(--ink)]">Manage Verticals</h1>
         {!isEditing && (
-          <button 
-            onClick={() => setIsEditing(true)} 
+          <button
+            onClick={() => setIsEditing(true)}
             className="bg-[var(--green)] px-5 py-2.5 rounded-lg text-white font-bold hover:bg-[var(--green-dark)] hover:-translate-y-0.5 transition-all shadow-sm"
           >
             Create New Vertical
@@ -143,22 +168,22 @@ export default function ManageVerticals() {
       {isEditing && (
         <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-sm border border-[var(--line)] mb-8">
           <h2 className="text-2xl font-bold mb-6 text-[var(--ink)] font-heading">{editingId ? 'Edit Vertical' : 'Create Vertical'}</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Name</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.name} 
-                onChange={e => setFormData({...formData, name: e.target.value})} 
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
                 placeholder="e.g. Technology"
               />
             </div>
             <div className="flex flex-wrap items-center mt-4 md:mt-8 gap-6">
               <label className="flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   className="w-4 h-4 text-[var(--green)] bg-white border-[var(--line)] rounded focus:ring-[var(--green)] accent-[var(--green)]"
                   checked={formData.active}
                   onChange={e => setFormData({...formData, active: e.target.checked})}
@@ -167,8 +192,8 @@ export default function ManageVerticals() {
               </label>
               <div className="flex items-center space-x-3">
                 <label className="flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="w-4 h-4 text-[var(--gold)] bg-white border-[var(--line)] rounded focus:ring-[var(--gold)] accent-[var(--gold)]"
                     checked={formData.featured}
                     onChange={e => setFormData({...formData, featured: e.target.checked})}
@@ -184,7 +209,7 @@ export default function ManageVerticals() {
                       max="4"
                       className="w-14 bg-white border border-[var(--line)] rounded-md px-2 py-0.5 text-center text-sm font-bold text-[var(--gold)] focus:outline-none focus:border-[var(--gold)]"
                       value={formData.featuredOrder}
-                      onChange={e => setFormData({...formData, featuredOrder: Math.min(3, Math.max(1, parseInt(e.target.value) || 1))})}
+                      onChange={e => setFormData({...formData, featuredOrder: Math.min(4, Math.max(1, parseInt(e.target.value) || 1))})}
                     />
                   </div>
                 )}
@@ -230,13 +255,13 @@ export default function ManageVerticals() {
                     )}
                   </td>
                   <td className="p-4 text-right space-x-3">
-                    <button 
+                    <button
                       onClick={() => handleEditClick(vertical)}
                       className="text-[var(--gray)] hover:text-[var(--green)] text-sm font-bold transition-colors"
                     >
                       Edit
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleDelete(vertical._id)}
                       className="text-[var(--red)] opacity-80 hover:opacity-100 text-sm font-bold transition-colors"
                     >

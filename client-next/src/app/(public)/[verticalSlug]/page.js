@@ -1,37 +1,48 @@
 import VerticalPageClient from '@/components/pages/VerticalPageClient';
 import { notFound } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { mapVertical, mapPost } from '@/lib/supabase/mappers';
 
-const getVerticalData = async (slug) => {
-  try {
-    const res = await fetch(`${process.env.API_URL}/verticals`, {
-      next: { revalidate: 300 }
-    });
-    const data = await res.json();
-    const vertical = data.data?.find(v => v.slug === slug);
+const POST_SELECT = 'id, title, slug, excerpt, banner_image, publish_date, status, editors_pick, created_at, updated_at, vertical:verticals(id, name, slug)';
 
-    if (!vertical) return { vertical: null, posts: [], morePosts: [], hasMore: false };
+async function getVerticalData(slug) {
+  const supabase = await createClient();
 
-    const postsRes = await fetch(`${process.env.API_URL}/posts?status=published&vertical=${vertical._id}&limit=23`, {
-      next: { revalidate: 300 }
-    });
-    const postsData = await postsRes.json();
-    
-    const allPosts = postsData.data || [];
-    return {
-      vertical,
-      posts: allPosts.slice(0, 15),
-      morePosts: allPosts.slice(15, 23),
-      hasMore: allPosts.length >= 23
-    };
-  } catch (error) {
-    return { vertical: null, posts: [], morePosts: [], hasMore: false };
-  }
-};
+  const { data: rawVertical, error: vErr } = await supabase
+    .from('verticals')
+    .select('*')
+    .eq('slug', slug)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (vErr) console.error('getVerticalData vertical:', vErr);
+  if (!rawVertical) return { vertical: null, posts: [], morePosts: [], hasMore: false };
+
+  const vertical = mapVertical(rawVertical);
+
+  const { data: postsRaw, error: pErr } = await supabase
+    .from('posts')
+    .select(POST_SELECT)
+    .eq('status', 'published')
+    .eq('vertical_id', vertical._id)
+    .order('created_at', { ascending: false })
+    .limit(23);
+
+  if (pErr) console.error('getVerticalData posts:', pErr);
+  const allPosts = (postsRaw ?? []).map(mapPost);
+
+  return {
+    vertical,
+    posts: allPosts.slice(0, 15),
+    morePosts: allPosts.slice(15, 23),
+    hasMore: allPosts.length >= 23,
+  };
+}
 
 export async function generateMetadata({ params }) {
   const { verticalSlug } = await params;
   const { vertical } = await getVerticalData(verticalSlug);
-  
+
   if (!vertical) return { title: 'Vertical Not Found | WalletPickle' };
 
   return {
@@ -58,19 +69,14 @@ export default async function VerticalPage({ params }) {
   const { verticalSlug } = await params;
   const { vertical, posts, morePosts, hasMore } = await getVerticalData(verticalSlug);
 
-  if (!vertical) {
-    notFound();
-  }
+  if (!vertical) notFound();
 
   return (
-    <>
-
-      <VerticalPageClient 
-        vertical={vertical} 
-        initialPosts={posts} 
-        initialMorePosts={morePosts}
-        initialHasMore={hasMore}
-      />
-    </>
+    <VerticalPageClient
+      vertical={vertical}
+      initialPosts={posts}
+      initialMorePosts={morePosts}
+      initialHasMore={hasMore}
+    />
   );
 }

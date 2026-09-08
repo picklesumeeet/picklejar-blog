@@ -2,37 +2,36 @@
 import Link from "next/link";
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from "@/context/AuthContext";
-import axios from "@/api/axios";
+import { createClient } from '@/lib/supabase/client';
 
 export default function AdminDashboard() {
   const { user } = useContext(AuthContext);
   const [stats, setStats] = useState({ posts: 0, petitions: 0, ads: 0 });
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
-    if (user?.role !== 'editor') {
-      const fetchStats = async () => {
-        try {
-          const [postsRes, petitionsRes, adsRes] = await Promise.all([
-            axios.get('/posts'),
-            axios.get('/petitions'),
-            axios.get('/ads')
-          ]);
-          setStats({
-            posts: postsRes.data.data?.length || 0,
-            petitions: petitionsRes.data.data?.length || 0,
-            ads: adsRes.data.data?.length || 0,
-          });
-        } catch (error) {
-          console.error("Failed to load stats", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchStats();
-    } else {
+    if (user?.role === 'editor' || !user) {
       setLoading(false);
+      return;
     }
+
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const [postsRes, petitionsRes, adsRes] = await Promise.all([
+        supabase.from('posts').select('*', { count: 'exact', head: true }),
+        supabase.from('petitions').select('*', { count: 'exact', head: true }).eq('active', true),
+        supabase.from('ads').select('*', { count: 'exact', head: true }),
+      ]);
+      if (cancelled) return;
+      setStats({
+        posts: postsRes.count ?? 0,
+        petitions: petitionsRes.count ?? 0,
+        ads: adsRes.count ?? 0,
+      });
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [user]);
 
   const allLinks = [
@@ -45,8 +44,7 @@ export default function AdminDashboard() {
     { title: 'Manage Subscribers', path: '/admin/subscribers', description: 'View and manage newsletter subscribers' },
   ];
 
-  // Filter links for editors to only see Posts
-  const adminLinks = user?.role === 'editor' 
+  const adminLinks = user?.role === 'editor'
     ? allLinks.filter(link => link.path === '/admin/posts')
     : allLinks;
 
@@ -56,11 +54,11 @@ export default function AdminDashboard() {
         {user?.role === 'editor' ? 'Editor Dashboard' : 'Welcome, Admin'}
       </h1>
       <p className="text-[var(--gray)] mb-8 font-medium">
-        {user?.role === 'editor' 
-          ? 'Welcome back. Access your assigned publishing tools below.' 
+        {user?.role === 'editor'
+          ? 'Welcome back. Access your assigned publishing tools below.'
           : 'Welcome back. Select a module to manage your site content.'}
       </p>
-      
+
       {user?.role !== 'editor' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {[
@@ -78,8 +76,8 @@ export default function AdminDashboard() {
 
       <div className={`grid grid-cols-1 ${user?.role === 'editor' ? 'md:grid-cols-1 max-w-xl' : 'md:grid-cols-2 md:grid-cols-3'} gap-6`}>
         {adminLinks.map((link) => (
-          <Link 
-            key={link.path} 
+          <Link
+            key={link.path}
             href={link.path}
             className="block p-6 bg-[var(--bg-2)] border border-[var(--line)] rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 hover:border-[var(--green)] transition-all duration-200 group"
           >

@@ -1,14 +1,25 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
-import axios from "@/api/axios";
+import { useState, useEffect, useRef, useContext } from 'react';
 import dynamic from 'next/dynamic';
-const PostEditor = dynamic(() => import('@/components/admin/PostEditor'), { ssr: false });
+import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
+import { mapPost, mapVertical } from '@/lib/supabase/mappers';
+import { AuthContext } from '@/context/AuthContext';
 import { uploadToCloudinary } from '@/utils/cloudinaryUpload';
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { optimizeCloudinaryUrl } from '@/utils/optimizeCloudinaryUrl';
-import Image from 'next/image';
+
+const PostEditor = dynamic(() => import('@/components/admin/PostEditor'), { ssr: false });
+
+const POST_LIST_SELECT = 'id, title, slug, status, banner_image, editors_pick, publish_date, created_at, updated_at, vertical:verticals(id, name, slug)';
+const POST_FULL_SELECT = `id, title, slug, excerpt, banner_image, body, status, publish_date, read_time, editors_pick, is_dummy_seed, created_at, updated_at, vertical:verticals(id, name, slug)`;
+
+function slugify(name) {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
 
 export default function ManagePosts() {
+  const { user: currentUser } = useContext(AuthContext);
   const [posts, setPosts] = useState([]);
   const [verticals, setVerticals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +28,9 @@ export default function ManagePosts() {
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVertical, setSelectedVertical] = useState('All');
-  
+  // Remember the pre-edit publish_date so we don't clobber it when re-saving.
+  const [existingPublishDate, setExistingPublishDate] = useState(null);
+
   const editorRef = useRef(null);
 
   const defaultForm = {
@@ -40,12 +53,15 @@ export default function ManagePosts() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [postsRes, verticalsRes] = await Promise.all([
-        axios.get('/posts'),
-        axios.get('/verticals')
+      const supabase = createClient();
+      const [postsRes, vertsRes] = await Promise.all([
+        supabase.from('posts').select(POST_LIST_SELECT).order('created_at', { ascending: false }),
+        supabase.from('verticals').select('*').order('featured_order').order('created_at', { ascending: false }),
       ]);
-      if (postsRes.data.success) setPosts(postsRes.data.data);
-      if (verticalsRes.data.success) setVerticals(verticalsRes.data.data);
+      if (postsRes.error) throw postsRes.error;
+      if (vertsRes.error) throw vertsRes.error;
+      setPosts((postsRes.data ?? []).map(mapPost));
+      setVerticals((vertsRes.data ?? []).map(mapVertical));
     } catch (error) {
       console.error('Failed to load data', error);
     } finally {
@@ -69,25 +85,32 @@ export default function ManagePosts() {
 
   const handleEditClick = async (post) => {
     try {
-      const res = await axios.get(`/posts/${post.slug}`);
-      if (res.data.success) {
-        const fullPost = res.data.data;
-        setIsEditing(true);
-        setEditingId(fullPost._id);
-        setFormData({
-          title: fullPost.title,
-          vertical: fullPost.vertical._id || fullPost.vertical,
-          excerpt: fullPost.excerpt || '',
-          bannerImage: fullPost.bannerImage || '',
-          status: fullPost.status,
-          editorsPick: fullPost.editorsPick || false,
-          sendNewsletter: false,
-          body: fullPost.body || { blocks: [] }
-        });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('posts')
+        .select(POST_FULL_SELECT)
+        .eq('slug', post.slug)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Post not found');
+
+      const fullPost = mapPost(data);
+      setIsEditing(true);
+      setEditingId(fullPost._id);
+      setExistingPublishDate(fullPost.publishDate ?? null);
+      setFormData({
+        title: fullPost.title,
+        vertical: fullPost.vertical?._id ?? '',
+        excerpt: fullPost.excerpt || '',
+        bannerImage: fullPost.bannerImage || '',
+        status: fullPost.status,
+        editorsPick: fullPost.editorsPick || false,
+        sendNewsletter: false,
+        body: fullPost.body || { blocks: [] }
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to fetch full post data');
+      alert(err.message || 'Failed to fetch full post data');
     }
   };
 
@@ -96,18 +119,19 @@ export default function ManagePosts() {
       return;
     }
     try {
-      const res = await axios.delete(`/posts/${id}`);
-      if (res.data.success) {
-        fetchInitialData();
-      }
+      const supabase = createClient();
+      const { error } = await supabase.from('posts').delete().eq('id', id);
+      if (error) throw error;
+      fetchInitialData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete post');
+      alert(err.message || 'Failed to delete post');
     }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
     setEditingId(null);
+    setExistingPublishDate(null);
     setFormData(defaultForm);
   };
 
@@ -119,32 +143,70 @@ export default function ManagePosts() {
         bodyData = await editorRef.current.save();
       }
 
-      const postPayload = {
-        ...formData,
-        body: bodyData
-      };
+      const supabase = createClient();
+      const nowIso = new Date().toISOString();
 
-      let savedPostId = null;
-
-      if (editingId) {
-        const res = await axios.put(`/posts/${editingId}`, postPayload);
-        if (res.data.success) {
-          savedPostId = editingId;
-        }
-      } else {
-        const res = await axios.post('/posts', postPayload);
-        if (res.data.success) {
-          savedPostId = res.data.data._id;
-        }
+      // publish_date is stamped the first time a post enters "published" status.
+      // Preserve any existing publish_date on subsequent edits.
+      let publishDate = existingPublishDate;
+      if (formData.status === 'published' && !publishDate) {
+        publishDate = nowIso;
       }
 
-      if (savedPostId) {
+      const basePayload = {
+        title: formData.title.trim(),
+        vertical_id: formData.vertical,
+        excerpt: formData.excerpt || null,
+        banner_image: formData.bannerImage || null,
+        body: bodyData ?? {},
+        status: formData.status,
+        publish_date: publishDate,
+        editors_pick: formData.editorsPick,
+      };
+
+      let savedPost = null;
+
+      if (editingId) {
+        const { data, error } = await supabase
+          .from('posts')
+          .update(basePayload)
+          .eq('id', editingId)
+          .select('id')
+          .single();
+        if (error) throw error;
+        savedPost = data;
+      } else {
+        const insertPayload = {
+          ...basePayload,
+          slug: slugify(formData.title),
+          author_id: currentUser?.id ?? null,
+        };
+        const { data, error } = await supabase
+          .from('posts')
+          .insert(insertPayload)
+          .select('id')
+          .single();
+        if (error) {
+          if (error.code === '23505') throw new Error('A post with that title already exists — pick a different title.');
+          throw error;
+        }
+        savedPost = data;
+      }
+
+      if (savedPost) {
         if (formData.sendNewsletter) {
           try {
-            const nlRes = await axios.post(`/posts/${savedPostId}/send-newsletter`);
-            alert(`Post saved! Newsletter status: ${nlRes.data.message}`);
+            const { data: fnResult, error: fnErr } = await supabase.functions.invoke('newsletter-send', {
+              body: { post_id: savedPost.id },
+            });
+            if (fnErr) throw fnErr;
+            const failed = fnResult?.total - fnResult?.sent;
+            const summary = failed
+              ? `Sent to ${fnResult.sent}/${fnResult.total} subscribers. ${failed} failed.`
+              : `Sent to ${fnResult?.sent ?? 0} subscribers.`;
+            alert(`Post saved. Newsletter: ${summary}`);
           } catch (nlErr) {
-            alert(`Post saved, but failed to send newsletter: ${nlErr.response?.data?.message || 'Unknown error'}`);
+            alert(`Post saved, but newsletter send failed: ${nlErr.message || 'Unknown error'}`);
           }
         } else {
           alert('Post saved successfully!');
@@ -153,7 +215,7 @@ export default function ManagePosts() {
         fetchInitialData();
       }
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to save post');
+      alert(error.message || 'Failed to save post');
     }
   };
 
@@ -161,7 +223,7 @@ export default function ManagePosts() {
 
   const filteredPosts = posts.filter(post => {
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const verticalId = typeof post.vertical === 'object' ? post.vertical?._id : post.vertical;
+    const verticalId = post.vertical?._id ?? null;
     const matchesVertical = selectedVertical === 'All' || verticalId === selectedVertical;
     return matchesSearch && matchesVertical;
   });
@@ -171,8 +233,8 @@ export default function ManagePosts() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-heading text-[var(--ink)]">Manage Posts</h1>
         {!isEditing && (
-          <button 
-            onClick={() => setIsEditing(true)} 
+          <button
+            onClick={() => setIsEditing(true)}
             className="bg-[var(--green)] px-5 py-2.5 rounded-lg text-white font-bold hover:bg-[var(--green-dark)] hover:-translate-y-0.5 transition-all shadow-sm"
           >
             Create New Post
@@ -185,25 +247,25 @@ export default function ManagePosts() {
           <h2 className="text-2xl font-bold mb-6 text-[var(--ink)] font-heading">
             {editingId ? `Editing: ${formData.title}` : 'Create New Post'}
           </h2>
-          
+
           <div>
             <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Title</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               required
               className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-              value={formData.title} 
-              onChange={e => setFormData({...formData, title: e.target.value})} 
+              value={formData.title}
+              onChange={e => setFormData({...formData, title: e.target.value})}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Vertical</label>
-              <select 
+              <select
                 required
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.vertical} 
+                value={formData.vertical}
                 onChange={e => setFormData({...formData, vertical: e.target.value})}
               >
                 <option value="">Select Vertical...</option>
@@ -214,16 +276,16 @@ export default function ManagePosts() {
             </div>
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Status</label>
-              <select 
+              <select
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.status} 
+                value={formData.status}
                 onChange={e => setFormData({...formData, status: e.target.value})}
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
               </select>
             </div>
-            
+
             <div className="col-span-2 flex flex-col gap-3 mt-2">
               <div className="flex items-center">
                 <input
@@ -237,7 +299,7 @@ export default function ManagePosts() {
                   Editor's Pick (Display in Sidebar)
                 </label>
               </div>
-              
+
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -247,7 +309,7 @@ export default function ManagePosts() {
                   className="w-4 h-4 text-[var(--green)] bg-white border-[var(--line)] rounded focus:ring-[var(--green)] accent-[var(--green)]"
                 />
                 <label htmlFor="sendNewsletter" className="ml-2 text-sm font-semibold text-[var(--ink-2)] cursor-pointer">
-                  Send Newsletter (Trigger email to all subscribers on save)
+                  Send Newsletter <span className="text-[var(--gray)] font-normal">(Blast this post to all subscribers via Resend)</span>
                 </label>
               </div>
             </div>
@@ -255,17 +317,17 @@ export default function ManagePosts() {
 
           <div>
             <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Excerpt</label>
-            <textarea 
+            <textarea
               className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 h-24 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-              value={formData.excerpt} 
-              onChange={e => setFormData({...formData, excerpt: e.target.value})} 
+              value={formData.excerpt}
+              onChange={e => setFormData({...formData, excerpt: e.target.value})}
             />
           </div>
 
           <div>
             <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Banner Image</label>
-            <input 
-              type="file" 
+            <input
+              type="file"
               accept="image/jpeg, image/png, image/webp"
               onChange={handleBannerUpload}
               className="mb-2 block w-full text-sm text-[var(--gray)] file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--bg-2)] file:text-[var(--ink)] hover:file:bg-[var(--line)] hover:file:text-[var(--ink)] file:transition-colors file:font-semibold cursor-pointer border border-[var(--line)] rounded-lg"
@@ -296,15 +358,15 @@ export default function ManagePosts() {
         <>
           <div className="bg-white p-6 rounded-xl shadow-sm mb-8 border border-[var(--line)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="w-full md:w-1/3">
-              <input 
-                type="text" 
-                placeholder="Search posts..." 
+              <input
+                type="text"
+                placeholder="Search posts..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-[var(--line)] rounded-full px-4 py-2 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors text-sm font-medium"
               />
             </div>
-            
+
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedVertical('All')}
@@ -351,13 +413,13 @@ export default function ManagePosts() {
                   </div>
                 </div>
                 <div className="flex space-x-4 sm:shrink-0 w-full sm:w-auto justify-end">
-                  <button 
+                  <button
                     onClick={() => handleEditClick(post)}
                     className="text-[var(--gray)] hover:text-[var(--green)] text-sm font-bold transition-colors"
                   >
                     Edit
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDelete(post._id)}
                     className="text-[var(--red)] opacity-80 hover:opacity-100 text-sm font-bold transition-colors"
                   >

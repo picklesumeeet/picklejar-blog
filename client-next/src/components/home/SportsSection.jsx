@@ -5,7 +5,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import PostTitle from '../shared/Typography/PostTitle';
 import { optimizeCloudinaryUrl } from '../../utils/optimizeCloudinaryUrl';
-import axios from '../../api/axios';
+import { createClient } from '@/lib/supabase/client';
+
+const DUPLICATE_SIGNATURE_PG_CODE = '23505';
 
 export default function SportsSection({ data }) {
   const [localPetitions, setLocalPetitions] = useState([]);
@@ -27,27 +29,30 @@ export default function SportsSection({ data }) {
     try {
       setSignLoading(true);
       setSignStatus({ id: petitionId, message: '', type: '' });
-      const res = await axios.post(`/petitions/${petitionId}/sign`, { email: signEmail });
-      
-      setSignStatus({ id: petitionId, message: res.data.message || 'Signed successfully!', type: 'success' });
-      localStorage.setItem(`signed_petition_${petitionId}`, 'true');
-      
-      setLocalPetitions(prev => prev.map(p => 
-        p._id === petitionId 
-          ? { ...p, signatureCount: res.data.signatureCount || (p.signatureCount + 1) } 
-          : p
-      ));
-      
-      setTimeout(() => {
-        setSigningPetitionId(null);
-      }, 2000);
-      
-    } catch (err) {
-      setSignStatus({ 
-        id: petitionId, 
-        message: err.response?.data?.message || 'Failed to sign petition', 
-        type: 'error' 
+
+      const supabase = createClient();
+      const { data: newCount, error } = await supabase.rpc('sign_petition', {
+        petition_id: petitionId,
+        signer_email: signEmail,
       });
+
+      if (error) {
+        if (error.code === DUPLICATE_SIGNATURE_PG_CODE) {
+          throw new Error("You've already signed this petition");
+        }
+        throw error;
+      }
+
+      setSignStatus({ id: petitionId, message: 'Signed successfully!', type: 'success' });
+      localStorage.setItem(`signed_petition_${petitionId}`, 'true');
+
+      setLocalPetitions(prev => prev.map(p =>
+        p._id === petitionId ? { ...p, signatureCount: newCount ?? (p.signatureCount + 1) } : p
+      ));
+
+      setTimeout(() => setSigningPetitionId(null), 2000);
+    } catch (err) {
+      setSignStatus({ id: petitionId, message: err.message || 'Failed to sign petition', type: 'error' });
     } finally {
       setSignLoading(false);
     }

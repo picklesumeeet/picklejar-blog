@@ -2,20 +2,24 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Ticker from "@/components/layout/Ticker";
 import TopAdBanner from "@/components/ads/TopAdBanner";
+import { createClient } from "@/lib/supabase/server";
+import { mapVertical } from "@/lib/supabase/mappers";
 
-const getVerticals = async () => {
-  try {
-    const res = await fetch(`${process.env.API_URL}/verticals`, {
-      next: { revalidate: 300 }
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.data?.filter(v => v.active) || [];
-  } catch (err) {
-    console.error(err);
+async function getVerticals() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('verticals')
+    .select('*')
+    .eq('active', true)
+    .order('featured_order', { ascending: true })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getVerticals:', error);
     return [];
   }
-};
+  return (data ?? []).map(mapVertical);
+}
 
 export default async function PublicLayout({ children }) {
   const verticals = await getVerticals();

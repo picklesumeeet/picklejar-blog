@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, Fragment, useContext } from 'react';
 import { AuthContext } from "@/context/AuthContext";
-import axios from "@/api/axios";
+import { createClient } from '@/lib/supabase/client';
+import { mapPetition } from '@/lib/supabase/mappers';
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
 export default function ManagePetitions() {
@@ -9,14 +10,14 @@ export default function ManagePetitions() {
   const [petitions, setPetitions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [currentPetition, setCurrentPetition] = useState(null);
-  
+
   const [expandedPetitionId, setExpandedPetitionId] = useState(null);
   const [signatures, setSignatures] = useState([]);
   const [loadingSignatures, setLoadingSignatures] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -33,10 +34,13 @@ export default function ManagePetitions() {
   const fetchPetitions = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/petitions');
-      if (res.data.success) {
-        setPetitions(res.data.data);
-      }
+      const supabase = createClient();
+      const { data, error: err } = await supabase
+        .from('petitions')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (err) throw err;
+      setPetitions((data ?? []).map(mapPetition));
     } catch (err) {
       setError('Failed to fetch petitions');
     } finally {
@@ -53,10 +57,14 @@ export default function ManagePetitions() {
     try {
       setExpandedPetitionId(id);
       setLoadingSignatures(true);
-      const res = await axios.get(`/petitions/${id}/signatures`);
-      if (res.data.success) {
-        setSignatures(res.data.data);
-      }
+      const supabase = createClient();
+      const { data, error: err } = await supabase
+        .from('petition_signatures')
+        .select('id, email, created_at')
+        .eq('petition_id', id)
+        .order('created_at', { ascending: false });
+      if (err) throw err;
+      setSignatures(data ?? []);
     } catch (err) {
       console.error('Failed to fetch signatures', err);
     } finally {
@@ -82,17 +90,28 @@ export default function ManagePetitions() {
     }
 
     try {
+      const supabase = createClient();
+      const payload = {
+        title: formData.title.trim(),
+        category: formData.category.trim(),
+        signature_count: formData.signatureCount,
+        goal_count: formData.goalCount,
+        active: formData.active,
+      };
+
       if (isEditing) {
-        await axios.put(`/petitions/${currentPetition._id}`, formData);
+        const { error: err } = await supabase.from('petitions').update(payload).eq('id', currentPetition._id);
+        if (err) throw err;
       } else {
-        await axios.post('/petitions', formData);
+        const { error: err } = await supabase.from('petitions').insert(payload);
+        if (err) throw err;
       }
       setIsEditing(false);
       setCurrentPetition(null);
       setFormData({ title: '', category: '', signatureCount: 0, goalCount: 0, active: true });
       fetchPetitions();
     } catch (err) {
-      setFormError(err.response?.data?.message || 'Failed to save petition');
+      setFormError(err.message || 'Failed to save petition');
     }
   };
 
@@ -111,10 +130,12 @@ export default function ManagePetitions() {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this petition?')) {
       try {
-        await axios.delete(`/petitions/${id}`);
+        const supabase = createClient();
+        const { error: err } = await supabase.from('petitions').delete().eq('id', id);
+        if (err) throw err;
         fetchPetitions();
       } catch (err) {
-        alert('Failed to delete petition');
+        alert(err.message || 'Failed to delete petition');
       }
     }
   };
@@ -142,7 +163,7 @@ export default function ManagePetitions() {
               {isEditing ? 'Edit Petition' : 'Add New Petition'}
             </h2>
             {formError && <div className="bg-[var(--red)]/10 text-[var(--red)] p-3 rounded-lg mb-4 text-sm font-medium">{formError}</div>}
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-[var(--ink-2)] text-sm mb-2 font-semibold">Title *</label>
@@ -155,7 +176,7 @@ export default function ManagePetitions() {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-[var(--ink-2)] text-sm mb-2 font-semibold">Category *</label>
                 <input
@@ -206,7 +227,7 @@ export default function ManagePetitions() {
                   Active
                 </label>
               </div>
-              
+
               <div className="flex space-x-3 pt-6">
                 <button
                   type="submit"
@@ -306,10 +327,10 @@ export default function ManagePetitions() {
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-[var(--line)]">
-                                        {signatures.map((sig, idx) => (
-                                          <tr key={idx} className="text-[var(--ink)] font-medium">
+                                        {signatures.map((sig) => (
+                                          <tr key={sig.id} className="text-[var(--ink)] font-medium">
                                             <td className="py-2">{sig.email}</td>
-                                            <td className="py-2">{new Date(sig.createdAt).toLocaleString()}</td>
+                                            <td className="py-2">{new Date(sig.created_at).toLocaleString()}</td>
                                           </tr>
                                         ))}
                                       </tbody>

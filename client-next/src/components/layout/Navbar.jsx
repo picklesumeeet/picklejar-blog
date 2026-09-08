@@ -3,10 +3,18 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import axios from '@/api/axios';
+import { createClient } from '@/lib/supabase/client';
 
-export default function Navbar() {
-  const [verticals, setVerticals] = useState([]);
+const DUPLICATE_EMAIL_PG_CODE = '23505';
+
+async function subscribeEmail(email) {
+  const supabase = createClient();
+  const unsubscribe_token = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)).replace(/-/g, '');
+  const { error } = await supabase.from('subscribers').insert({ email, unsubscribe_token });
+  if (error && error.code !== DUPLICATE_EMAIL_PG_CODE) throw error;
+}
+
+export default function Navbar({ verticals = [] }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,23 +51,21 @@ export default function Navbar() {
   const handleSubscribe = async (e) => {
     e.preventDefault();
     if (!email) return;
-    
+
     setSubscribeStatus('loading');
     try {
-      const res = await axios.post('/subscribers', { email });
-      if (res.data.success) {
-        setSubscribeStatus('success');
-        setSubscribeMessage('Thanks for subscribing!');
-        setTimeout(() => {
-          setIsSubscribeModalOpen(false);
-          setSubscribeStatus('idle');
-          setSubscribeMessage('');
-          setEmail('');
-        }, 3000);
-      }
+      await subscribeEmail(email);
+      setSubscribeStatus('success');
+      setSubscribeMessage('Thanks for subscribing!');
+      setTimeout(() => {
+        setIsSubscribeModalOpen(false);
+        setSubscribeStatus('idle');
+        setSubscribeMessage('');
+        setEmail('');
+      }, 3000);
     } catch (err) {
       setSubscribeStatus('error');
-      setSubscribeMessage(err.response?.data?.message || 'Something went wrong. Please try again.');
+      setSubscribeMessage(err.message || 'Something went wrong. Please try again.');
     }
   };
 
@@ -76,20 +82,6 @@ export default function Navbar() {
 
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
-
-  useEffect(() => {
-    const fetchVerticals = async () => {
-      try {
-        const res = await axios.get('/verticals');
-        if (res.data.success) {
-          setVerticals(res.data.data.filter(v => v.active));
-        }
-      } catch (err) {
-        console.error('Failed to load verticals', err);
-      }
-    };
-    fetchVerticals();
-  }, []);
 
   useEffect(() => {
     const handleScroll = () => {

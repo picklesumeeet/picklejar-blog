@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useContext } from 'react';
-import axios from "@/api/axios";
+import { createClient } from '@/lib/supabase/client';
 import { AuthContext } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
@@ -16,10 +16,13 @@ export default function ManageSubscribers() {
   const fetchSubscribers = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/subscribers');
-      if (res.data.success) {
-        setSubscribers(res.data.data);
-      }
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('subscribers')
+        .select('id, email, subscribed_at, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setSubscribers(data ?? []);
     } catch (error) {
       console.error('Failed to load subscribers', error);
     } finally {
@@ -32,12 +35,12 @@ export default function ManageSubscribers() {
       return;
     }
     try {
-      const res = await axios.delete(`/subscribers/${id}`);
-      if (res.data.success) {
-        fetchSubscribers();
-      }
+      const supabase = createClient();
+      const { error } = await supabase.from('subscribers').delete().eq('id', id);
+      if (error) throw error;
+      fetchSubscribers();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete subscriber');
+      alert(err.message || 'Failed to delete subscriber');
     }
   };
 
@@ -69,16 +72,14 @@ export default function ManageSubscribers() {
           </thead>
           <tbody>
             {subscribers.map(s => (
-              <tr key={s._id} className="border-b border-[var(--line)] hover:bg-[var(--bg-2)]/50 transition-colors group">
-                <td className="px-6 py-4 font-bold text-[var(--ink)]">
-                  {s.email}
-                </td>
+              <tr key={s.id} className="border-b border-[var(--line)] hover:bg-[var(--bg-2)]/50 transition-colors group">
+                <td className="px-6 py-4 font-bold text-[var(--ink)]">{s.email}</td>
                 <td className="px-6 py-4 text-[var(--ink)] font-medium">
-                  {new Date(s.createdAt).toLocaleDateString()}
+                  {new Date(s.subscribed_at || s.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 text-right space-x-4">
-                  <button 
-                    onClick={() => handleDelete(s._id)}
+                  <button
+                    onClick={() => handleDelete(s.id)}
                     className="text-[var(--red)] opacity-80 hover:opacity-100 text-sm font-bold transition-colors"
                   >
                     Delete

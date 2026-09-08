@@ -1,48 +1,36 @@
+import { createClient } from '@/lib/supabase/server';
+
 export default async function sitemap() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  
-  const routes = [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-    }
-  ];
+  const supabase = await createClient();
 
-  try {
-    const apiUrl = process.env.API_URL || 'http://localhost:5000/api';
-    
-    // Fetch Verticals
-    const verticalsRes = await fetch(`${apiUrl}/verticals`);
-    if (verticalsRes.ok) {
-      const vData = await verticalsRes.json();
-      if (vData.success) {
-        vData.data.forEach(v => {
-          routes.push({
-            url: `${baseUrl}/${v.slug}`,
-            lastModified: new Date(),
-          });
-        });
-      }
-    }
+  const routes = [{ url: baseUrl, lastModified: new Date() }];
 
-    // Fetch Posts (fetching a large batch for the sitemap)
-    const postsRes = await fetch(`${apiUrl}/posts?status=published&limit=5000`);
-    if (postsRes.ok) {
-      const pData = await postsRes.json();
-      if (pData.success) {
-        pData.data.forEach(post => {
-          const vSlug = post.vertical?.slug || 'vertical';
-          let date = new Date(post.updatedAt || post.createdAt);
-          if (isNaN(date.getTime())) date = new Date();
-          routes.push({
-            url: `${baseUrl}/${vSlug}/${post.slug}`,
-            lastModified: date,
-          });
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Failed to generate full sitemap:', err);
+  const [{ data: verticals }, { data: posts }] = await Promise.all([
+    supabase.from('verticals').select('slug, updated_at').eq('active', true),
+    supabase
+      .from('posts')
+      .select('slug, updated_at, created_at, vertical:verticals(slug)')
+      .eq('status', 'published')
+      .limit(5000),
+  ]);
+
+  for (const v of verticals ?? []) {
+    routes.push({
+      url: `${baseUrl}/${v.slug}`,
+      lastModified: v.updated_at ? new Date(v.updated_at) : new Date(),
+    });
+  }
+
+  for (const p of posts ?? []) {
+    const vSlug = p.vertical?.slug || 'vertical';
+    const rawDate = p.updated_at || p.created_at;
+    let date = rawDate ? new Date(rawDate) : new Date();
+    if (isNaN(date.getTime())) date = new Date();
+    routes.push({
+      url: `${baseUrl}/${vSlug}/${p.slug}`,
+      lastModified: date,
+    });
   }
 
   return routes;

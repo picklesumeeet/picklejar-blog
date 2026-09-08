@@ -28,7 +28,7 @@ export default function AdminLogin() {
       await login(email, password);
       router.replace('/admin/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Login failed');
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }

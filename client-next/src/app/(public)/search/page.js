@@ -1,80 +1,103 @@
 "use client";
 import Link from 'next/link';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import axios from "@/api/axios";
+import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
+import { mapPost, mapVertical } from '@/lib/supabase/mappers';
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import PostTitle from "@/components/shared/Typography/PostTitle";
 import PostExcerpt from "@/components/shared/Typography/PostExcerpt";
 import SectionDividerAd from "@/components/ads/SectionDividerAd";
 import { optimizeCloudinaryUrl } from '@/utils/optimizeCloudinaryUrl';
-import Image from 'next/image';
-import { Suspense } from 'react';
+
+const PAGE_SIZE = 10;
+const POST_SELECT = 'id, title, slug, excerpt, banner_image, publish_date, status, editors_pick, created_at, updated_at, vertical:verticals(id, name, slug), author:profiles(id, name)';
+
+function timeRangeCutoff(range) {
+  const now = Date.now();
+  switch (range) {
+    case '24h':   return new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    case 'week':  return new Date(now - 7  * 24 * 60 * 60 * 1000).toISOString();
+    case 'month': return new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+    default:      return null;
+  }
+}
 
 function SearchContent() {
   const [query, setQuery] = useState('');
   const [verticals, setVerticals] = useState([]);
   const [selectedVertical, setSelectedVertical] = useState('all');
   const [timeRange, setTimeRange] = useState('any');
-  
+
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const [isVisible, setIsVisible] = useState(false);
   const searchTimeout = useRef(null);
-  
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
   useEffect(() => {
     setIsVisible(true);
-    
-    axios.get('/verticals').then(res => {
-      if (res.data.success) {
-        setVerticals(res.data.data.filter(v => v.active));
-      }
-    }).catch(err => console.error(err));
+    const supabase = createClient();
+    supabase.from('verticals').select('*').eq('active', true).order('featured_order').then(({ data, error }) => {
+      if (error) { console.error(error); return; }
+      setVerticals((data ?? []).map(mapVertical));
+    });
   }, []);
 
   useEffect(() => {
     const q = searchParams?.get('q') || '';
     const v = searchParams?.get('vertical') || 'all';
     const t = searchParams?.get('timeRange') || 'any';
-    
+
     if (q !== query) setQuery(q);
     if (v !== selectedVertical) setSelectedVertical(v);
     if (t !== timeRange) setTimeRange(t);
-    
+
     fetchResults(q, v, t, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const fetchResults = async (q, v, t, reset = false) => {
     try {
-      if (reset) {
-        setLoading(true);
-        setHasMore(true);
-      } else {
-        setLoadingMore(true);
+      if (reset) { setLoading(true); setHasMore(true); }
+      else       { setLoadingMore(true); }
+
+      const supabase = createClient();
+      let request = supabase
+        .from('posts')
+        .select(POST_SELECT)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false });
+
+      if (q.trim()) {
+        // Match the old regex-on-title behavior.
+        request = request.ilike('title', `%${q.trim()}%`);
       }
-      
+      if (v && v !== 'all') {
+        request = request.eq('vertical_id', v);
+      }
+      const cutoff = timeRangeCutoff(t);
+      if (cutoff) {
+        request = request.gte('created_at', cutoff);
+      }
+
       const skip = reset ? 0 : posts.length;
-      const res = await axios.get(`/posts/search?q=${encodeURIComponent(q)}&vertical=${v}&timeRange=${t}&limit=10&skip=${skip}`);
-      
-      if (res.data.success) {
-        const newPosts = res.data.data;
-        if (reset) {
-          setPosts(newPosts);
-        } else {
-          setPosts(prev => [...prev, ...newPosts]);
-        }
-        
-        if (newPosts.length < 10) {
-          setHasMore(false);
-        }
-      }
+      request = request.range(skip, skip + PAGE_SIZE - 1);
+
+      const { data, error } = await request;
+      if (error) throw error;
+
+      const newPosts = (data ?? []).map(mapPost);
+      if (reset) setPosts(newPosts);
+      else       setPosts(prev => [...prev, ...newPosts]);
+      if (newPosts.length < PAGE_SIZE) setHasMore(false);
     } catch (err) {
       console.error('Failed to fetch search results', err);
     } finally {
@@ -86,9 +109,7 @@ function SearchContent() {
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setQuery(val);
-    
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    
     searchTimeout.current = setTimeout(() => {
       updateUrl(val, selectedVertical, timeRange);
     }, 500);
@@ -104,27 +125,25 @@ function SearchContent() {
     if (q) params.set('q', q);
     if (v !== 'all') params.set('vertical', v);
     if (t !== 'any') params.set('timeRange', t);
-    
     router.push(`${pathname}?${params.toString()}`, { replace: true });
   };
 
   const formatTimestamp = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
     const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHrs / 24);
-    
+
     if (diffHrs < 24) {
       return diffHrs === 0 ? 'Just now' : `${diffHrs} hr ago`;
     }
-    
     return date.toLocaleDateString('en-US', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   return (
     <div className={`bg-white min-h-screen pb-20 transition-opacity duration-300 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-      
+
       {/* Search Header Area */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6">
         <div className="flex flex-col lg:flex-row lg:items-end gap-6 border-b border-[var(--ink)] pb-4">
@@ -132,9 +151,9 @@ function SearchContent() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-black absolute left-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input 
-              type="text" 
-              placeholder="Search Wallet Pickle" 
+            <input
+              type="text"
+              placeholder="Search Wallet Pickle"
               value={query}
               onChange={handleSearchChange}
               className="w-full bg-transparent text-black text-2xl md:text-3xl font-sans font-bold outline-none pl-10 pr-10 placeholder-gray-400"
@@ -147,9 +166,9 @@ function SearchContent() {
               </button>
             )}
           </div>
-          
+
           <div className="flex items-center gap-4 text-sm font-sans shrink-0">
-            <select 
+            <select
               value={selectedVertical}
               onChange={(e) => updateUrl(query, e.target.value, timeRange)}
               className="bg-white text-black border border-gray-300 rounded px-4 py-2 outline-none hover:border-[var(--ink)] cursor-pointer"
@@ -159,8 +178,8 @@ function SearchContent() {
                 <option key={v._id} value={v._id}>{v.name}</option>
               ))}
             </select>
-            
-            <select 
+
+            <select
               value={timeRange}
               onChange={(e) => updateUrl(query, selectedVertical, e.target.value)}
               className="bg-white text-black border border-gray-300 rounded px-4 py-2 outline-none hover:border-[var(--ink)] cursor-pointer"
@@ -173,10 +192,10 @@ function SearchContent() {
           </div>
         </div>
       </div>
-      
+
       {/* Content Layout */}
       <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-16">
-        
+
         {/* Left Column: Results */}
         <div className="lg:col-span-8 flex flex-col">
           <div className="flex justify-between items-end border-b border-[var(--line)] pb-4 mb-6">
@@ -184,7 +203,7 @@ function SearchContent() {
               {query ? 'All Results' : 'Latest Stories'}
             </h2>
           </div>
-          
+
           {loading ? (
             <div className="py-12"><LoadingSpinner /></div>
           ) : posts.length === 0 ? (
@@ -196,7 +215,7 @@ function SearchContent() {
                   <div className="w-full sm:w-[120px] shrink-0 text-sm text-[var(--gray-2)] font-sans">
                     {formatTimestamp(post.publishDate || post.createdAt)}
                   </div>
-                  
+
                   <div className="flex-1 flex flex-col">
                     <Link href={`/${post.vertical?.slug || 'vertical'}/${post.slug}`} className="group block mb-3">
                       <PostTitle title={post.title} size="medium" className="mb-2 group-hover:text-[var(--green)] transition-colors" />
@@ -213,7 +232,7 @@ function SearchContent() {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="w-full sm:w-[180px] shrink-0">
                     <Link href={`/${post.vertical?.slug || 'vertical'}/${post.slug}`}>
                       {post.bannerImage ? (
@@ -225,10 +244,10 @@ function SearchContent() {
                   </div>
                 </div>
               ))}
-              
+
               {hasMore && (
                 <div className="flex justify-center mt-8">
-                  <button 
+                  <button
                     onClick={() => fetchResults(query, selectedVertical, timeRange, false)}
                     disabled={loadingMore}
                     className="px-8 py-3 border-2 border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-white rounded-full font-bold transition-colors disabled:opacity-50 cursor-pointer"
@@ -240,19 +259,16 @@ function SearchContent() {
             </div>
           )}
         </div>
-        
+
         {/* Right Sidebar */}
         <aside className="lg:col-span-4 relative">
           <div className="sticky top-6 flex flex-col gap-12">
-            
-            {/* Ad Widget */}
             <div className="w-full bg-white flex justify-center py-4 border border-gray-200">
               <SectionDividerAd />
             </div>
-            
           </div>
         </aside>
-        
+
       </div>
     </div>
   );

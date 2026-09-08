@@ -1,11 +1,21 @@
 "use client";
 import { useState, useEffect, useContext } from 'react';
-import axios from "@/api/axios";
+import { createClient } from '@/lib/supabase/client';
+import { mapAd, mapVertical } from '@/lib/supabase/mappers';
 import { AuthContext } from "@/context/AuthContext";
 import { uploadToCloudinary } from '@/utils/cloudinaryUpload';
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { optimizeCloudinaryUrl } from '@/utils/optimizeCloudinaryUrl';
 import Image from 'next/image';
+
+// Form uses hyphenated legacy values ('in-article'); DB stores snake_case ('in_article').
+const PLACEMENT_TO_DB = {
+  'homepage': 'homepage',
+  'sidebar': 'sidebar',
+  'in-article': 'in_article',
+  'top-banner': 'top_banner',
+  'section-divider': 'section_divider',
+};
 
 export default function ManageAds() {
   const { user: currentUser } = useContext(AuthContext);
@@ -14,7 +24,7 @@ export default function ManageAds() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  
+
   const initialFormState = {
     _id: null,
     name: '',
@@ -32,32 +42,25 @@ export default function ManageAds() {
   const [formData, setFormData] = useState(initialFormState);
 
   useEffect(() => {
-    fetchAds();
-    fetchVerticals();
+    fetchAll();
   }, []);
 
-  const fetchAds = async () => {
+  const fetchAll = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/ads');
-      if (res.data.success) {
-        setAds(res.data.data);
-      }
+      const supabase = createClient();
+      const [adsRes, vertsRes] = await Promise.all([
+        supabase.from('ads').select('*').order('created_at', { ascending: false }),
+        supabase.from('verticals').select('*').order('featured_order').order('created_at', { ascending: false }),
+      ]);
+      if (adsRes.error) throw adsRes.error;
+      if (vertsRes.error) throw vertsRes.error;
+      setAds((adsRes.data ?? []).map(mapAd));
+      setVerticals((vertsRes.data ?? []).map(mapVertical));
     } catch (error) {
-      console.error('Failed to load ads', error);
+      console.error('Failed to load ads/verticals', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchVerticals = async () => {
-    try {
-      const res = await axios.get('/verticals');
-      if (res.data.success) {
-        setVerticals(res.data.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch verticals', error);
     }
   };
 
@@ -78,28 +81,34 @@ export default function ManageAds() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = { ...formData };
-      if (!payload.targetVertical) payload.targetVertical = null;
-      if (!payload.startDate) payload.startDate = null;
-      if (!payload.endDate) payload.endDate = null;
+      const supabase = createClient();
+      const payload = {
+        name: formData.name.trim(),
+        type: formData.type,
+        placement: PLACEMENT_TO_DB[formData.placement] ?? formData.placement,
+        cta_text: formData.ctaText || null,
+        cta_url: formData.ctaUrl || null,
+        image: formData.image || null,
+        active: formData.active,
+        target_vertical_id: formData.targetVertical || null,
+        start_date: formData.startDate ? new Date(formData.startDate).toISOString() : null,
+        end_date: formData.endDate ? new Date(formData.endDate).toISOString() : null,
+      };
 
       if (formData._id) {
-        const res = await axios.put(`/ads/${formData._id}`, payload);
-        if (res.data.success) {
-          alert('Ad updated successfully!');
-        }
+        const { error } = await supabase.from('ads').update(payload).eq('id', formData._id);
+        if (error) throw error;
+        alert('Ad updated successfully!');
       } else {
-        delete payload._id;
-        const res = await axios.post('/ads', payload);
-        if (res.data.success) {
-          alert('Ad created successfully!');
-        }
+        const { error } = await supabase.from('ads').insert(payload);
+        if (error) throw error;
+        alert('Ad created successfully!');
       }
       setFormData(initialFormState);
       setIsEditing(false);
-      fetchAds();
+      fetchAll();
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to save ad');
+      alert(error.message || 'Failed to save ad');
     }
   };
 
@@ -108,7 +117,7 @@ export default function ManageAds() {
       _id: ad._id,
       name: ad.name || '',
       type: ad.type,
-      placement: ad.placement,
+      placement: ad.placement,  // already legacy-hyphenated via mapAd
       ctaText: ad.ctaText || '',
       ctaUrl: ad.ctaUrl || '',
       image: ad.image || '',
@@ -121,15 +130,14 @@ export default function ManageAds() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this ad?')) {
-      try {
-        const res = await axios.delete(`/ads/${id}`);
-        if (res.data.success) {
-          fetchAds();
-        }
-      } catch (error) {
-        alert(error.response?.data?.message || 'Failed to delete ad');
-      }
+    if (!window.confirm('Are you sure you want to delete this ad?')) return;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('ads').delete().eq('id', id);
+      if (error) throw error;
+      fetchAll();
+    } catch (error) {
+      alert(error.message || 'Failed to delete ad');
     }
   };
 
@@ -152,11 +160,7 @@ export default function ManageAds() {
   // Summary counts for active in-article ads grouped by vertical
   const inArticleAds = ads.filter(ad => ad.placement === 'in-article' && ad.active);
   const summaryCounts = {};
-  
-  // Initialize with all verticals set to 0
-  verticals.forEach(v => {
-    summaryCounts[v.name] = 0;
-  });
+  verticals.forEach(v => { summaryCounts[v.name] = 0; });
   summaryCounts['Global'] = 0;
 
   inArticleAds.forEach(ad => {
@@ -169,7 +173,7 @@ export default function ManageAds() {
   });
 
   const summaryString = Object.entries(summaryCounts)
-    .filter(([_, count]) => count > 0 || Object.keys(summaryCounts).length > 0)
+    .filter(([, count]) => count > 0 || Object.keys(summaryCounts).length > 0)
     .map(([name, count]) => `${name}: ${count}`)
     .join(' · ');
 
@@ -178,8 +182,8 @@ export default function ManageAds() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-heading text-[var(--ink)]">Manage Ads</h1>
         {!isEditing && (
-          <button 
-            onClick={() => setIsEditing(true)} 
+          <button
+            onClick={() => setIsEditing(true)}
             className="bg-[var(--green)] px-5 py-2.5 rounded-lg text-white font-bold hover:bg-[var(--green-dark)] hover:-translate-y-0.5 transition-all shadow-sm"
           >
             Create New Ad
@@ -187,7 +191,7 @@ export default function ManageAds() {
         )}
       </div>
 
-      {!isEditing && inArticleAds.length >= 0 && (
+      {!isEditing && (
         <div className="mb-6 bg-[var(--bg-2)] border border-[var(--line)] p-4 rounded-lg text-sm text-[var(--ink)]">
           <span className="font-bold text-[var(--ink)] mr-2 font-heading">In-Article Coverage:</span>
           {summaryString || 'No in-article ads active.'}
@@ -198,21 +202,21 @@ export default function ManageAds() {
         <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-sm border border-[var(--line)] mb-8">
           <div>
             <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Ad Name</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               required
               className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-              value={formData.name} 
-              onChange={e => setFormData({...formData, name: e.target.value})} 
+              value={formData.name}
+              onChange={e => setFormData({...formData, name: e.target.value})}
             />
           </div>
           <div className="grid grid-cols-2 gap-6">
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Type</label>
-              <select 
+              <select
                 required
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.type} 
+                value={formData.type}
                 onChange={e => setFormData({...formData, type: e.target.value})}
               >
                 <option value="banner">Banner</option>
@@ -221,10 +225,10 @@ export default function ManageAds() {
             </div>
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Placement</label>
-              <select 
+              <select
                 required
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.placement} 
+                value={formData.placement}
                 onChange={e => setFormData({...formData, placement: e.target.value})}
               >
                 <option value="homepage">Homepage</option>
@@ -239,20 +243,20 @@ export default function ManageAds() {
           <div className="grid grid-cols-2 gap-6">
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">CTA Text</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.ctaText} 
-                onChange={e => setFormData({...formData, ctaText: e.target.value})} 
+                value={formData.ctaText}
+                onChange={e => setFormData({...formData, ctaText: e.target.value})}
               />
             </div>
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">CTA URL</label>
-              <input 
-                type="url" 
+              <input
+                type="url"
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.ctaUrl} 
-                onChange={e => setFormData({...formData, ctaUrl: e.target.value})} 
+                value={formData.ctaUrl}
+                onChange={e => setFormData({...formData, ctaUrl: e.target.value})}
               />
             </div>
           </div>
@@ -260,9 +264,9 @@ export default function ManageAds() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Target Vertical</label>
-              <select 
+              <select
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.targetVertical} 
+                value={formData.targetVertical}
                 onChange={e => setFormData({...formData, targetVertical: e.target.value})}
               >
                 <option value="">Global / No target</option>
@@ -273,26 +277,26 @@ export default function ManageAds() {
             </div>
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Start Date</label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.startDate} 
-                onChange={e => setFormData({...formData, startDate: e.target.value})} 
+                value={formData.startDate}
+                onChange={e => setFormData({...formData, startDate: e.target.value})}
               />
             </div>
             <div>
               <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">End Date</label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 className="w-full bg-white border border-[var(--line)] rounded-lg p-2.5 text-[var(--ink)] focus:outline-none focus:border-[var(--green)] focus:ring-1 focus:ring-[var(--green)] transition-colors"
-                value={formData.endDate} 
-                onChange={e => setFormData({...formData, endDate: e.target.value})} 
+                value={formData.endDate}
+                onChange={e => setFormData({...formData, endDate: e.target.value})}
               />
             </div>
           </div>
           <div className="flex items-center space-x-2 mt-2">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               id="active"
               checked={formData.active}
               onChange={e => setFormData({...formData, active: e.target.checked})}
@@ -303,8 +307,8 @@ export default function ManageAds() {
 
           <div>
             <label className="block mb-2 text-sm font-semibold text-[var(--ink-2)]">Ad Image</label>
-            <input 
-              type="file" 
+            <input
+              type="file"
               accept="image/jpeg, image/png, image/webp"
               onChange={handleImageUpload}
               className="mb-2 block w-full text-sm text-[var(--gray)] file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--bg-2)] file:text-[var(--ink)] hover:file:bg-[var(--line)] hover:file:text-[var(--ink)] file:transition-colors file:font-semibold cursor-pointer border border-[var(--line)] rounded-lg"
@@ -340,7 +344,7 @@ export default function ManageAds() {
                     {!ad.active && <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-[var(--red)]/10 text-[var(--red)]">Inactive</span>}
                   </h3>
                   <p className="text-sm text-[var(--gray)] mt-1">Type: <span className="text-[var(--ink)] font-semibold">{ad.type.toUpperCase()}</span> | Placement: <span className="text-[var(--ink)] font-semibold">{ad.placement}</span></p>
-                  
+
                   {ad.placement === 'in-article' && (
                     <p className="text-sm text-[var(--gray)] mt-1">
                       Target: <span className="text-[var(--ink)] font-semibold">
@@ -348,26 +352,26 @@ export default function ManageAds() {
                       </span>
                     </p>
                   )}
-                  
+
                   {ad.endDate && (
                     <p className="text-sm text-[var(--red)] font-semibold mt-1">
                       Expires: {new Date(ad.endDate).toLocaleDateString()}
                     </p>
                   )}
-                  
+
                   <a href={ad.ctaUrl} target="_blank" rel="noreferrer" className="text-[var(--green)] text-sm font-semibold hover:underline block mt-2 truncate">
                     {ad.ctaText || 'No CTA Text / Link'}
                   </a>
                 </div>
               </div>
               <div className="flex space-x-4 sm:shrink-0 w-full sm:w-auto justify-end">
-                <button 
+                <button
                   onClick={() => handleEditClick(ad)}
                   className="text-[var(--gray)] hover:text-[var(--green)] text-sm font-bold transition-colors bg-transparent px-2"
                 >
                   Edit
                 </button>
-                <button 
+                <button
                   onClick={() => handleDelete(ad._id)}
                   className="text-[var(--red)] opacity-80 hover:opacity-100 text-sm font-bold transition-colors bg-transparent px-2"
                 >

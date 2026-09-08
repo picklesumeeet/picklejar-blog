@@ -1,9 +1,7 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import axios from '@/api/axios';
-
 
 import PostPageSkeleton from '@/components/shared/PostPageSkeleton';
 import EditorJsRenderer from '@/components/shared/EditorJsRenderer';

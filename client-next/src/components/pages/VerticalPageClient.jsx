@@ -2,7 +2,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import axios from '@/api/axios';
+import { createClient } from '@/lib/supabase/client';
+import { mapPost } from '@/lib/supabase/mappers';
+
+const POST_SELECT = 'id, title, slug, excerpt, banner_image, publish_date, status, editors_pick, created_at, updated_at, vertical:verticals(id, name, slug)';
 
 import VerticalPageSkeleton from '@/components/shared/VerticalPageSkeleton';
 import PostTitle from '@/components/shared/Typography/PostTitle';
@@ -22,14 +25,20 @@ export default function VerticalPageClient({ vertical, initialPosts, initialMore
     setLoadingMore(true);
     try {
       const skipAmount = 15 + morePosts.length;
-      const res = await axios.get(`/posts?status=published&vertical=${vertical._id}&limit=8&skip=${skipAmount}`);
-      if (res.data.success) {
-        const newPosts = res.data.data;
-        setMorePosts(prev => [...prev, ...newPosts]);
-        if (newPosts.length < 8) {
-          setHasMore(false);
-        }
-      }
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('posts')
+        .select(POST_SELECT)
+        .eq('status', 'published')
+        .eq('vertical_id', vertical._id)
+        .order('created_at', { ascending: false })
+        .range(skipAmount, skipAmount + 7);   // inclusive: 8 rows
+
+      if (error) throw error;
+
+      const newPosts = (data ?? []).map(mapPost);
+      setMorePosts(prev => [...prev, ...newPosts]);
+      if (newPosts.length < 8) setHasMore(false);
     } catch (err) {
       console.error('Failed to load more posts', err);
     } finally {

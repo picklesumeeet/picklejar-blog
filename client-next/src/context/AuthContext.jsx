@@ -1,51 +1,77 @@
 "use client";
 
-import React, { createContext, useState, useEffect } from 'react';
-import axios from '../api/axios';
+import React, { createContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export const AuthContext = createContext();
+
+async function fetchProfile(supabase, userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name, role')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('fetchProfile:', error);
+    return null;
+  }
+  return data;
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = useMemo(() => createClient(), []);
+
+  const hydrateFromAuthUser = useCallback(async (authUser) => {
+    if (!authUser) {
+      setUser(null);
+      return;
+    }
+    const profile = await fetchProfile(supabase, authUser.id);
+    setUser({
+      id: authUser.id,
+      email: authUser.email,
+      name: profile?.name ?? authUser.email,
+      role: profile?.role ?? 'editor',
+    });
+  }, [supabase]);
 
   useEffect(() => {
-    const fetchMe = async () => {
-      try {
-        const { data } = await axios.get('/auth/me');
-        if (data.success && data.data && data.data.user) {
-          setUser(data.data.user);
-        }
-      } catch (error) {
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    const path = window.location.pathname;
-    const isPublicAdminRoute = path.startsWith('/admin/login') || path.startsWith('/admin/forgot-password') || path.startsWith('/admin/reset-password');
-    if (path.startsWith('/admin') && !isPublicAdminRoute) {
-      fetchMe();
-    } else {
+    let cancelled = false;
+    (async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (cancelled) return;
+      await hydrateFromAuthUser(authUser);
       setIsLoading(false);
-    }
-  }, []);
+    })();
 
-  const login = async (email, password) => { 
-    const res = await axios.post('/auth/login', { email, password });
-    if (res.data.success && res.data.data && res.data.data.user) {
-      setUser(res.data.data.user);
-    }
-    return res.data;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await hydrateFromAuthUser(session?.user ?? null);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription?.unsubscribe();
+    };
+  }, [supabase, hydrateFromAuthUser]);
+
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // onAuthStateChange will also fire, but hydrate synchronously so the
+    // caller's next line (router.replace) sees a populated user.
+    await hydrateFromAuthUser(data.user);
+    return { success: true };
   };
-  
-  const logout = async () => { 
+
+  const logout = async () => {
     try {
-      await axios.post('/auth/logout');
+      await supabase.auth.signOut();
     } catch (err) {
-      console.error(err);
+      console.error('signOut:', err);
     } finally {
-      setUser(null); 
+      setUser(null);
       window.location.href = '/admin/login';
     }
   };
