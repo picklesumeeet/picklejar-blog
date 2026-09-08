@@ -116,21 +116,29 @@ async function getPostData(slug) {
 }
 
 export async function generateMetadata({ params }) {
-  const { postSlug } = await params;
+  const { verticalSlug, postSlug } = await params;
   const post = await getPostData(postSlug);
 
   if (!post) return { title: 'Post Not Found | WalletPickle' };
 
+  const canonicalPath = `/${post.vertical?.slug || verticalSlug}/${post.slug}`;
+
   return {
     title: `${post.title} - WalletPickle`,
     description: post.excerpt || `Read ${post.title} on WalletPickle`,
+    alternates: { canonical: canonicalPath },
     openGraph: {
       title: `${post.title} - WalletPickle`,
       description: post.excerpt || `Read ${post.title} on WalletPickle`,
+      url: canonicalPath,
       images: [
         { url: post.bannerImage || 'https://walletpickle.com/logo.png' }
       ],
       type: 'article',
+      publishedTime: post.publishDate || post.createdAt,
+      modifiedTime: post.updatedAt || post.createdAt,
+      section: post.vertical?.name,
+      authors: post.author?.name ? [post.author.name] : undefined,
     },
     twitter: {
       card: 'summary_large_image',
@@ -139,6 +147,22 @@ export async function generateMetadata({ params }) {
       images: [post.bannerImage || 'https://walletpickle.com/logo.png'],
     }
   };
+}
+
+function countWordsInBody(body) {
+  if (!body) return undefined;
+  const blocks = Array.isArray(body?.blocks) ? body.blocks : (Array.isArray(body) ? body : null);
+  if (!blocks) return typeof body === 'string' ? body.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length : undefined;
+  let text = '';
+  for (const b of blocks) {
+    const d = b?.data;
+    if (!d) continue;
+    if (typeof d.text === 'string') text += ' ' + d.text;
+    if (Array.isArray(d.items)) text += ' ' + d.items.map(i => typeof i === 'string' ? i : (i?.content ?? '')).join(' ');
+    if (typeof d.caption === 'string') text += ' ' + d.caption;
+  }
+  const n = text.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
+  return n || undefined;
 }
 
 export default async function PostPage({ params }) {
@@ -155,17 +179,48 @@ export default async function PostPage({ params }) {
     initialAds = [post.inArticleAds[0], post.inArticleAds[0]];
   }
 
-  const jsonLd = {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const verticalSlug = post.vertical?.slug;
+  const postUrl = verticalSlug ? `${siteUrl}/${verticalSlug}/${post.slug}` : `${siteUrl}/${post.slug}`;
+  const wordCount = countWordsInBody(post.body);
+
+  const blogPostingLd = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: post.title,
-    image: post.bannerImage ? [post.bannerImage] : [],
+    description: post.excerpt || undefined,
+    image: post.bannerImage ? [post.bannerImage] : [`${siteUrl}/logo.png`],
     datePublished: post.publishDate || post.createdAt,
     dateModified: post.updatedAt || post.createdAt,
+    articleSection: post.vertical?.name || undefined,
+    wordCount,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
     author: {
       '@type': 'Person',
       name: post.author?.name || 'WalletPickle Editorial',
-    }
+      url: `${siteUrl}/about`,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'WalletPickle',
+      url: siteUrl,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteUrl}/logo.png`,
+      },
+    },
+  };
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      verticalSlug && post.vertical?.name
+        ? { '@type': 'ListItem', position: 2, name: post.vertical.name, item: `${siteUrl}/${verticalSlug}` }
+        : null,
+      { '@type': 'ListItem', position: verticalSlug ? 3 : 2, name: post.title, item: postUrl },
+    ].filter(Boolean),
   };
 
   return (
@@ -173,7 +228,12 @@ export default async function PostPage({ params }) {
       <script
         type="application/ld+json"
         nonce={nonce}
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingLd) }}
+      />
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
       <PostPageClient
         initialData={post}

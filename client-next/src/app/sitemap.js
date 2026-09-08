@@ -6,6 +6,11 @@ export default async function sitemap() {
 
   const routes = [{ url: baseUrl, lastModified: new Date() }];
 
+  const staticPaths = ['about', 'contact', 'press', 'careers', 'advertise', 'terms', 'privacy', 'cookies'];
+  for (const path of staticPaths) {
+    routes.push({ url: `${baseUrl}/${path}`, lastModified: new Date() });
+  }
+
   const [{ data: verticals }, { data: posts }] = await Promise.all([
     supabase.from('verticals').select('slug, updated_at').eq('active', true),
     supabase

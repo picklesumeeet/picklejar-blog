@@ -4,12 +4,14 @@ import FeaturedVerticalSection from '@/components/home/FeaturedVerticalSection';
 import MoreStoriesSection from '@/components/home/MoreStoriesSection';
 import SectionDividerAd from '@/components/ads/SectionDividerAd';
 import SportsSection from '@/components/home/SportsSection';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { mapPost, mapVertical, mapAd, mapPetition } from '@/lib/supabase/mappers';
 
 export const metadata = {
   title: 'WalletPickle',
   description: 'The latest stories, news, and trends.',
+  alternates: { canonical: '/' },
   openGraph: {
     title: 'WalletPickle',
     description: 'The latest stories, news, and trends.',
@@ -23,6 +25,12 @@ export const metadata = {
       }
     ],
     type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'WalletPickle',
+    description: 'The latest stories, news, and trends.',
+    images: ['https://walletpickle.com/logo.png'],
   },
 };
 
@@ -116,9 +124,44 @@ async function getHomeData() {
 
 export default async function HomePage() {
   const homeData = await getHomeData();
+  const nonce = (await headers()).get('x-nonce') || undefined;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+  const organizationLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'WalletPickle',
+    url: siteUrl,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${siteUrl}/logo.png`,
+    },
+  };
+
+  const websiteLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'WalletPickle',
+    url: siteUrl,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${siteUrl}/search?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  };
 
   return (
     <div className="max-w-[1440px] mx-auto px-6 py-10">
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+      />
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
+      />
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="flex-1 w-full">
           <TrendingSection data={homeData.trending} latestData={homeData.moreStories} adData={homeData.ads?.sidebar} />

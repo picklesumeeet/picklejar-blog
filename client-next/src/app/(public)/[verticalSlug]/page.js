@@ -1,5 +1,6 @@
 import VerticalPageClient from '@/components/pages/VerticalPageClient';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { mapVertical, mapPost } from '@/lib/supabase/mappers';
 
@@ -48,6 +49,7 @@ export async function generateMetadata({ params }) {
   return {
     title: `${vertical.name} - WalletPickle`,
     description: `Read the latest stories about ${vertical.name} on WalletPickle.`,
+    alternates: { canonical: `/${vertical.slug}` },
     openGraph: {
       title: `${vertical.name} - WalletPickle`,
       description: `Read the latest stories about ${vertical.name} on WalletPickle.`,
@@ -62,6 +64,12 @@ export async function generateMetadata({ params }) {
       ],
       type: 'website',
     },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${vertical.name} - WalletPickle`,
+      description: `Read the latest stories about ${vertical.name} on WalletPickle.`,
+      images: ['https://walletpickle.com/logo.png'],
+    },
   };
 }
 
@@ -71,12 +79,55 @@ export default async function VerticalPage({ params }) {
 
   if (!vertical) notFound();
 
+  const nonce = (await headers()).get('x-nonce') || undefined;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const verticalUrl = `${siteUrl}/${vertical.slug}`;
+
+  const collectionLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: `${vertical.name} - WalletPickle`,
+    description: `Read the latest stories about ${vertical.name} on WalletPickle.`,
+    url: verticalUrl,
+    isPartOf: { '@type': 'WebSite', name: 'WalletPickle', url: siteUrl },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: posts.slice(0, 10).map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `${siteUrl}/${vertical.slug}/${p.slug}`,
+        name: p.title,
+      })),
+    },
+  };
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: vertical.name, item: verticalUrl },
+    ],
+  };
+
   return (
-    <VerticalPageClient
-      vertical={vertical}
-      initialPosts={posts}
-      initialMorePosts={morePosts}
-      initialHasMore={hasMore}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionLd) }}
+      />
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+      />
+      <VerticalPageClient
+        vertical={vertical}
+        initialPosts={posts}
+        initialMorePosts={morePosts}
+        initialHasMore={hasMore}
+      />
+    </>
   );
 }
