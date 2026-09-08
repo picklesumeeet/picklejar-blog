@@ -132,7 +132,7 @@ export async function generateMetadata({ params }) {
       description: post.excerpt || `Read ${post.title} on WalletPickle`,
       url: canonicalPath,
       images: [
-        { url: post.bannerImage || 'https://walletpickle.com/logo.png' }
+        { url: post.bannerImage || '/og-image.png' }
       ],
       type: 'article',
       publishedTime: post.publishDate || post.createdAt,
@@ -144,7 +144,7 @@ export async function generateMetadata({ params }) {
       card: 'summary_large_image',
       title: `${post.title} - WalletPickle`,
       description: post.excerpt || `Read ${post.title} on WalletPickle`,
-      images: [post.bannerImage || 'https://walletpickle.com/logo.png'],
+      images: [post.bannerImage || '/og-image.png'],
     }
   };
 }

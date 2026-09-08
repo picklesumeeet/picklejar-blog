@@ -18,7 +18,7 @@ export const metadata = {
     url: '/',
     images: [
       {
-        url: 'https://walletpickle.com/logo.png',
+        url: '/og-image.png',
         width: 1200,
         height: 630,
         alt: 'WalletPickle',
@@ -30,7 +30,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'WalletPickle',
     description: 'The latest stories, news, and trends.',
-    images: ['https://walletpickle.com/logo.png'],
+    images: ['/og-image.png'],
   },
 };
 

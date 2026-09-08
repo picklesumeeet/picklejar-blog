@@ -25,12 +25,47 @@ const gaId = process.env.NEXT_PUBLIC_GA_ID;
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
-  title: "WalletPickle",
+  title: {
+    default: "WalletPickle",
+    template: "%s | WalletPickle",
+  },
   description: "The best place for sports and finance news.",
-  // Google Search Console verification — replace with your actual code from GSC
-  // (Property → Ownership verification → HTML tag → copy the content value)
+  applicationName: "WalletPickle",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'WalletPickle',
+    title: 'WalletPickle',
+    description: 'The best place for sports and finance news.',
+    url: '/',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'WalletPickle' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'WalletPickle',
+    description: 'The best place for sports and finance news.',
+    images: ['/og-image.png'],
+  },
+  alternates: {
+    types: {
+      'application/rss+xml': [{ url: '/rss.xml', title: 'WalletPickle RSS Feed' }],
+    },
+  },
   verification: {
     google: process.env.NEXT_PUBLIC_GSC_VERIFICATION || undefined,
+    other: process.env.NEXT_PUBLIC_BING_VERIFICATION
+      ? { 'msvalidate.01': process.env.NEXT_PUBLIC_BING_VERIFICATION }
+      : undefined,
   },
 };
 

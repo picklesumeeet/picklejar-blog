@@ -56,7 +56,7 @@ export async function generateMetadata({ params }) {
       url: `/${vertical.slug}`,
       images: [
         {
-          url: 'https://walletpickle.com/logo.png',
+          url: '/og-image.png',
           width: 1200,
           height: 630,
           alt: `${vertical.name} - WalletPickle`,
@@ -68,7 +68,7 @@ export async function generateMetadata({ params }) {
       card: 'summary_large_image',
       title: `${vertical.name} - WalletPickle`,
       description: `Read the latest stories about ${vertical.name} on WalletPickle.`,
-      images: ['https://walletpickle.com/logo.png'],
+      images: ['/og-image.png'],
     },
   };
 }
