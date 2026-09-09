@@ -1,0 +1,156 @@
+{
+  "title": "Retire Richer: 12 Affordable US Cities You'll Love",
+  "excerpt": "Unlock the secrets to stress-free retirement in these hidden gem cities, where vibrant culture and comfort meet unbeatable low costs.",
+  "author": "WalletPickle Editorial",
+  "publishDate": null,
+  "readTime": 8,
+  "primaryVerticalSlug": "personal-finance",
+  "heroImage": null,
+  "disclosure": "Advertiser Disclosure: WalletPickle may earn a commission from partner links on this page. Our editorial picks are not influenced by compensation.",
+  "intro": [
+    "PLACEHOLDER intro paragraph one. Frame the promise of the article — what the reader gets by reading, and who it's for.",
+    "PLACEHOLDER intro paragraph two. One more short line to set expectations and invite the scroll."
+  ],
+  "items": [
+    {
+      "title": "PLACEHOLDER — Pick #1 (inline-link style — no Pro Tip)",
+      "image": null,
+      "paragraphs": [
+        "Replace with a short description. Writers can drop affiliate links **anywhere** in a paragraph using markdown — for example, a [reverse mortgage](#) can turn home equity into tax-free cash for retirees, no monthly payments required.",
+        "Optional second paragraph. No 'Pro Tip' callout on this item — the inline link above is the full affiliate placement."
+      ]
+    },
+    {
+      "title": "PLACEHOLDER — Pick #2 (Pro Tip callout style)",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy. This item uses the classic MTN 'Pro Tip:' callout instead of an inline link.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "Repair costs are climbing. [Compare extended car warranty coverage](#) in 60 seconds.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — Pick #3 (mixed — inline + Pro Tip)",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy. Retirees on a budget often overlook the fact that [cell service](#) can be cut to under $15/month on MVNO carriers.",
+        "**Bold text** is also supported. Use it sparingly for emphasis."
+      ],
+      "proTip": {
+        "text": "Paying more than $15 a month for cell service? Here's how to cut that in half.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #4",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "Get access to affordable telehealth in under 2 minutes — no insurance required.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #5",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "A home warranty can cover appliances, heating, and cooling. See what's included.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #6",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "Tired of saying \"What?\" The FDA now lets you buy top hearing aids without a prescription.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #7",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "A medical alert system could be the difference between living and dying. Compare vetted providers.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #8",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "Over $150k in savings? Get matched with a fiduciary financial advisor — free.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #9",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "Boost your shopping power: a no-interest credit card for stress-free spending.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #10",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "Life Line Screening reveals hidden health risks so you can act early. Book a screening.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #11",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "Cut your home insurance bill by up to 30% — compare quotes in one form.",
+        "url": "#"
+      }
+    },
+    {
+      "title": "PLACEHOLDER — City / Pick #12",
+      "image": null,
+      "paragraphs": [
+        "Replace with real copy.",
+        "Optional second paragraph."
+      ],
+      "proTip": {
+        "text": "High-yield savings accounts are paying 4%+ APY. See today's top picks.",
+        "url": "#"
+      }
+    }
+  ]
+}
