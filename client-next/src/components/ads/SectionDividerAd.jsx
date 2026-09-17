@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import { optimizeCloudinaryUrl } from '../../utils/optimizeCloudinaryUrl';
 
+const HOUSE_AD_HREF = 'https://coverageprofessor.com/';
+
 export default function SectionDividerAd({ data: ad }) {
 
   return (
@@ -18,9 +20,9 @@ export default function SectionDividerAd({ data: ad }) {
           )}
         </a>
       ) : (
-        <div className="w-full h-full border-2 border-dashed border-[var(--gray-2)] flex items-center justify-center text-[var(--gray-2)] bg-[var(--bg)]">
-          <span className="font-bold text-sm tracking-widest uppercase">AD SPACE — Section Divider</span>
-        </div>
+        <a href={HOUSE_AD_HREF} target="_blank" rel="noreferrer" className="block w-full h-full">
+          <Image src="/ad.png" alt="Advertisement" width={1200} height={200} className="w-full h-full object-cover border border-[var(--line)] rounded-sm" />
+        </a>
       )}
     </div>
   );
