@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-const HOUSE_AD_HREF = 'https://coverageprofessor.com/';
+const HOUSE_AD_HREF = 'https://ratepickle.o18a.com/c?o=21952245&m=28014&a=775147&aff_click_id={replace_it}&sub_aff_id={replace_it}';
 
 export default function TopAdBanner() {
   return (
