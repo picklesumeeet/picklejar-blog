@@ -1,8 +1,8 @@
 "use client";
-import React, { useState } from 'react';
-import { useRouter, useParams } from "next/navigation";
+import React, { useState, useEffect } from 'react';
+import { useRouter } from "next/navigation";
 import Image from 'next/image';
-import axios from "@/api/axios";
+import { createClient } from '@/lib/supabase/client';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -12,8 +12,19 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const router = useRouter();
-  const { token } = useParams();
+
+  useEffect(() => {
+    const supabase = createClient();
+    // Supabase parses the recovery token from the URL hash and fires PASSWORD_RECOVERY.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsReady(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,13 +44,15 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      const response = await axios.post(`/auth/reset-password/${token}`, { password });
-      setMessage(response.data.message);
+      const supabase = createClient();
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
+      setMessage('Password updated successfully.');
       setTimeout(() => {
         router.push('/admin/login');
       }, 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid or expired token');
+      setError(err.message || 'Failed to update password. The reset link may be invalid or expired.');
     } finally {
       setLoading(false);
     }
@@ -64,7 +77,7 @@ export default function ResetPassword() {
           <h1 className="text-3xl font-bold text-center mb-8 font-heading text-[var(--ink)]">
             Reset Password
           </h1>
-          
+
           {message && (
             <div className="bg-[var(--green)]/10 border border-[var(--green)] text-[var(--green-dark)] px-4 py-3 rounded mb-6 text-center text-sm font-bold">
               {message}
@@ -78,7 +91,26 @@ export default function ResetPassword() {
             </div>
           )}
 
-          {!message && (
+          {!message && !isReady && (
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-[var(--line)] text-center space-y-3">
+              <h2 className="text-lg font-semibold text-[var(--ink)]">Verifying reset link…</h2>
+              <p className="text-sm text-[var(--gray)] font-medium">
+                If you arrived here from a password reset email, hold on a moment.
+              </p>
+              <p className="text-sm text-[var(--gray)] font-medium">
+                If nothing happens, the link may be invalid or expired.{' '}
+                <button
+                  onClick={() => router.push('/admin/forgot-password')}
+                  className="text-[var(--green)] hover:underline font-bold"
+                >
+                  Request a new link
+                </button>
+                .
+              </p>
+            </div>
+          )}
+
+          {!message && isReady && (
             <form onSubmit={handleSubmit} className="space-y-5 bg-white p-8 rounded-xl shadow-sm border border-[var(--line)]">
               <div>
                 <label className="block text-sm font-semibold mb-1 text-[var(--ink-2)]">New Password</label>
@@ -131,7 +163,7 @@ export default function ResetPassword() {
                   </button>
                 </div>
               </div>
-              
+
               <button
                 type="submit"
                 disabled={loading}

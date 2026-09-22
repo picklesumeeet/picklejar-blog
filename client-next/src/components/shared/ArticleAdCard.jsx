@@ -65,22 +65,46 @@ export default function ArticleAdCard({ ad }) {
     );
   }
 
+  if (ad.imageOnly && ad.image) {
+    return (
+      <div className="w-full bg-white border border-gray-200 p-4 flex flex-col relative mb-6 rounded-lg shadow-sm">
+        <div className="text-[10px] text-gray-400 text-center uppercase tracking-wider mb-3 font-sans">
+          Advertisement
+        </div>
+        <a
+          href={ad.ctaUrl || '#'}
+          target="_blank"
+          rel="noreferrer sponsored"
+          className="block w-full overflow-hidden rounded-md"
+        >
+          <Image
+            src={ad.image}
+            alt={ad.altText || 'Advertisement'}
+            width={600}
+            height={450}
+            className="w-full h-auto"
+          />
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full bg-white border border-gray-200 p-4 flex flex-col relative group mb-6 rounded-lg shadow-sm">
       <div className="text-[10px] text-gray-400 text-center uppercase tracking-wider mb-3 font-sans">
         Advertisement
       </div>
-      
+
       {ad.image ? (
         <div className="w-full aspect-[4/3] mb-4 overflow-hidden bg-gray-100 rounded-md">
-          <Image 
-            src={optimizeCloudinaryUrl(ad.image, { width: 600, crop: 'fill' })} 
-            alt={ad.ctaText || 'Advertisement'} 
+          <Image
+            src={optimizeCloudinaryUrl(ad.image, { width: 600, crop: 'fill' })}
+            alt={ad.ctaText || 'Advertisement'}
             crossOrigin="anonymous"
             width={600}
             height={450}
             onLoad={handleImageLoad}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         </div>
       ) : (
@@ -88,13 +112,13 @@ export default function ArticleAdCard({ ad }) {
           Advertisement
         </div>
       )}
-      
-      <a 
-        href={ad.ctaUrl || '#'} 
-        target="_blank" 
+
+      <a
+        href={ad.ctaUrl || '#'}
+        target="_blank"
         rel="noreferrer"
-        style={{ 
-          backgroundColor: isHovered ? hoverColor : buttonColor, 
+        style={{
+          backgroundColor: isHovered ? hoverColor : buttonColor,
           color: textColor,
           transition: 'background-color 0.2s ease-in-out'
         }}

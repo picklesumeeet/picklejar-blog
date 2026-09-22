@@ -5,6 +5,23 @@ import { createClient } from '@/lib/supabase/server';
 import { mapPost, mapAd } from '@/lib/supabase/mappers';
 
 const POST_SELECT = 'id, title, slug, excerpt, banner_image, publish_date, status, editors_pick, created_at, updated_at, vertical:verticals(id, name, slug)';
+
+const RATEPICKLE_AFFILIATE_URL = 'https://ratepickle.o18a.com/c?o=22029896&m=28014&a=747930&aff_click_id={replace_it}&sub_aff_id={replace_it}';
+
+const FALLBACK_IN_ARTICLE_ADS = [
+  {
+    _id: 'house-ad-bestmoney-1',
+    image: '/ads/besmoney1.png',
+    ctaUrl: RATEPICKLE_AFFILIATE_URL,
+    imageOnly: true,
+  },
+  {
+    _id: 'house-ad-bestmoney-2',
+    image: '/ads/bestmoney2.png',
+    ctaUrl: RATEPICKLE_AFFILIATE_URL,
+    imageOnly: true,
+  },
+];
 const POST_FULL_SELECT = `
   id, title, slug, excerpt, banner_image, body, status, publish_date, read_time,
   editors_pick, is_dummy_seed, created_at, updated_at,
@@ -178,6 +195,8 @@ export default async function PostPage({ params }) {
   } else if (post.inArticleAds?.length === 1) {
     initialAds = [post.inArticleAds[0], post.inArticleAds[0]];
   }
+  if (!initialAds[0]) initialAds[0] = FALLBACK_IN_ARTICLE_ADS[0];
+  if (!initialAds[1]) initialAds[1] = FALLBACK_IN_ARTICLE_ADS[1];
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
   const verticalSlug = post.vertical?.slug;

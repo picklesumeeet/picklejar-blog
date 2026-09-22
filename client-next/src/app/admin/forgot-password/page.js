@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useRouter } from "next/navigation";
 import Image from 'next/image';
-import axios from "@/api/axios";
+import { createClient } from '@/lib/supabase/client';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -23,10 +23,14 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      const response = await axios.post('/auth/forgot-password', { email });
-      setMessage(response.data.message);
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/admin/reset-password`,
+      });
+      if (resetError) throw resetError;
+      setMessage('If an account exists for that email, a reset link has been sent. Check your inbox.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Something went wrong');
+      setError(err.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -53,7 +57,7 @@ export default function ForgotPassword() {
             Forgot Password
           </h1>
           <p className="text-[var(--gray)] text-center mb-8 font-medium">Enter your email and we'll send you a link to reset your password.</p>
-          
+
           {message && (
             <div className="bg-[var(--green)]/10 border border-[var(--green)] text-[var(--green-dark)] px-4 py-3 rounded mb-6 text-center text-sm font-bold">
               {message}
@@ -77,7 +81,7 @@ export default function ForgotPassword() {
                 placeholder="admin@example.com"
               />
             </div>
-            
+
             <button
               type="submit"
               disabled={loading}
