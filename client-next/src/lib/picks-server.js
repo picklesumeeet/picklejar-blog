@@ -1,10 +1,11 @@
 import 'server-only';
 
 import { createClient } from '@/lib/supabase/server';
-import { mapVertical, mapPost, mapAd } from '@/lib/supabase/mappers';
-import { getPick, getPickSlugs } from '@/lib/picks';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { mapPost, mapAd, mapPick } from '@/lib/supabase/mappers';
 
 const POST_SELECT = 'id, title, slug, excerpt, banner_image, publish_date, status, editors_pick, created_at, updated_at, vertical:verticals(id, name, slug)';
+const PICK_SELECT = 'id, title, slug, excerpt, author, hero_image, disclosure, read_time, primary_vertical_id, intro, items, status, publish_date, created_at, updated_at, vertical:verticals!primary_vertical_id(id, name, slug, active)';
 
 function formatDate(publishDate) {
   const d = publishDate ? new Date(publishDate) : new Date();
@@ -13,22 +14,32 @@ function formatDate(publishDate) {
   });
 }
 
-export async function hydratePick(slug) {
-  const pick = getPick(slug);
-  if (!pick) return null;
+// Uses the service-role client so it works from `generateStaticParams`
+// (which runs at build time without a cookie/auth context).
+export async function getPickSlugs() {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('picks')
+    .select('slug')
+    .eq('status', 'published')
+    .order('created_at', { ascending: false });
+  return (data ?? []).map(row => row.slug);
+}
 
+export async function hydratePick(slug) {
   const supabase = await createClient();
 
-  let vertical = null;
-  if (pick.primaryVerticalSlug) {
-    const { data: rawV } = await supabase
-      .from('verticals')
-      .select('*')
-      .eq('slug', pick.primaryVerticalSlug)
-      .eq('active', true)
-      .maybeSingle();
-    if (rawV) vertical = mapVertical(rawV);
-  }
+  const { data: rawPick } = await supabase
+    .from('picks')
+    .select(PICK_SELECT)
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .maybeSingle();
+
+  if (!rawPick) return null;
+
+  const pick = mapPick(rawPick);
+  const vertical = pick.vertical && pick.vertical.active ? pick.vertical : null;
 
   const [postsRes, adsRes] = await Promise.all([
     vertical
@@ -65,10 +76,9 @@ export async function hydratePick(slug) {
   };
 }
 
-export function getUpcomingSlugs(currentSlug) {
-  return getPickSlugs()
-    .filter(s => s !== currentSlug)
-    .sort();
+export async function getUpcomingSlugs(currentSlug) {
+  const slugs = await getPickSlugs();
+  return slugs.filter(s => s !== currentSlug).sort();
 }
 
 export const BATCH_SIZE = 10;

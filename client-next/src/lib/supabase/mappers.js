@@ -55,6 +55,30 @@ export function mapPetition(p) {
   };
 }
 
+// Picks can come with joined `vertical:verticals(*)`.
+export function mapPick(p) {
+  if (!p) return null;
+  return {
+    _id: p.id,
+    title: p.title,
+    slug: p.slug,
+    excerpt: p.excerpt,
+    author: p.author,
+    heroImage: p.hero_image,
+    disclosure: p.disclosure,
+    readTime: p.read_time,
+    primaryVerticalId: p.primary_vertical_id,
+    primaryVerticalSlug: p.vertical?.slug ?? null,
+    vertical: p.vertical ? mapVertical(p.vertical) : null,
+    intro: Array.isArray(p.intro) ? p.intro : [],
+    items: Array.isArray(p.items) ? p.items : [],
+    status: p.status,
+    publishDate: p.publish_date,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+  };
+}
+
 // Posts can come from Supabase with joined `vertical:verticals(*)`, joined
 // `author:profiles(*)`, and joined `ad_slot_1:ads(*)` / `ad_slot_2:ads(*)`.
 // Any of those may be absent depending on the select() used.

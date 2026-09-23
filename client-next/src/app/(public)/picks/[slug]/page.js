@@ -2,11 +2,11 @@ import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 
 import PicksStream from '@/components/pages/PicksStream';
-import { getPickSlugs } from '@/lib/picks';
-import { hydratePick, hydratePicks, getUpcomingSlugs, BATCH_SIZE } from '@/lib/picks-server';
+import { getPickSlugs, hydratePick, hydratePicks, getUpcomingSlugs, BATCH_SIZE } from '@/lib/picks-server';
 
-export function generateStaticParams() {
-  return getPickSlugs().map(slug => ({ slug }));
+export async function generateStaticParams() {
+  const slugs = await getPickSlugs();
+  return slugs.map(slug => ({ slug }));
 }
 
 export async function generateMetadata({ params }) {
@@ -41,7 +41,7 @@ export async function generateMetadata({ params }) {
 export default async function PickPage({ params }) {
   const { slug } = await params;
 
-  const upcomingSlugs = getUpcomingSlugs(slug);
+  const upcomingSlugs = await getUpcomingSlugs(slug);
   const initialSlugs = [slug, ...upcomingSlugs.slice(0, BATCH_SIZE - 1)];
   const remainingSlugs = upcomingSlugs.slice(BATCH_SIZE - 1);
 
