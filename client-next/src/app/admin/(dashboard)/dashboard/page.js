@@ -36,7 +36,7 @@ export default function AdminDashboard() {
 
   const allLinks = [
     { title: 'Manage Posts', path: '/admin/posts', description: 'Create, edit, and publish articles' },
-    { title: 'Manage Listicles', path: '/admin/picks', description: 'Author picks/listicle pages at /picks/[slug]' },
+    { title: 'Manage Listicles', path: '/admin/picks', description: 'Write and publish list-style articles' },
     { title: 'Manage Verticals', path: '/admin/verticals', description: 'Manage content categories and slugs' },
     { title: 'Manage Petitions', path: '/admin/petitions', description: 'Manage trending petitions and goals' },
     { title: 'Manage Ads', path: '/admin/ads', description: 'Configure banner and sponsored placements' },
