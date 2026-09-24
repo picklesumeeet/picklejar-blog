@@ -14,6 +14,18 @@ function formatDate(publishDate) {
   });
 }
 
+// Card list for the /picks index page — published only, newest first.
+export async function getPublishedPicks() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('picks')
+    .select('id, title, slug, excerpt, hero_image, publish_date, created_at, vertical:verticals!primary_vertical_id(id, name, slug)')
+    .eq('status', 'published')
+    .order('publish_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  return (data ?? []).map(mapPick);
+}
+
 // Uses the service-role client so it works from `generateStaticParams`
 // (which runs at build time without a cookie/auth context).
 export async function getPickSlugs() {

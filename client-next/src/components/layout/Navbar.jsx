@@ -126,15 +126,45 @@ export default function Navbar({ verticals = [] }) {
           </Link>
 
           <div className="hidden xl:flex items-center text-[#f2eee2]" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: "11px", letterSpacing: "0.9px", fontWeight: 600, gap: "18px" }}>
-            {verticals.slice(0, 9).map(v => (
-              <Link key={v._id} href={`/${v.slug}`}
-                onClick={() => { setSearchOpen(false); setMoreOpen(false); }}
-                className="relative group py-1 uppercase text-[#f2eee2]"
-              >
-                {v.name}
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
-              </Link>
-            ))}
+            {(() => {
+              const primary = verticals.slice(0, 9);
+              const hasWhatToBuy = primary.some(v => v.slug === 'what-to-buy');
+              const nodes = [];
+              primary.forEach(v => {
+                nodes.push(
+                  <Link key={v._id} href={`/${v.slug}`}
+                    onClick={() => { setSearchOpen(false); setMoreOpen(false); }}
+                    className="relative group py-1 uppercase text-[#f2eee2]"
+                  >
+                    {v.name}
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
+                  </Link>
+                );
+                if (v.slug === 'what-to-buy') {
+                  nodes.push(
+                    <Link key="listicles" href="/picks"
+                      onClick={() => { setSearchOpen(false); setMoreOpen(false); }}
+                      className="relative group py-1 uppercase text-[#f2eee2]"
+                    >
+                      Listicles
+                      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
+                    </Link>
+                  );
+                }
+              });
+              if (!hasWhatToBuy) {
+                nodes.push(
+                  <Link key="listicles" href="/picks"
+                    onClick={() => { setSearchOpen(false); setMoreOpen(false); }}
+                    className="relative group py-1 uppercase text-[#f2eee2]"
+                  >
+                    Listicles
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
+                  </Link>
+                );
+              }
+              return nodes;
+            })()}
             {verticals.length > 9 && (
               <button
                 onMouseEnter={handleMoreEnter}
@@ -202,15 +232,44 @@ export default function Navbar({ verticals = [] }) {
         >
           <div className="max-w-[1440px] mx-auto px-6">
             <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-[#f2eee2]" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: "11px", letterSpacing: "0.9px", fontWeight: 600 }}>
-              {verticals.map(v => (
-                      <Link key={v._id} href={`/${v.slug}`}
-                  onClick={() => setMoreOpen(false)}
-                  className="relative group py-1 uppercase text-[#f2eee2]"
-                >
-                  {v.name}
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
-                </Link>
-              ))}
+              {(() => {
+                const hasWhatToBuy = verticals.some(v => v.slug === 'what-to-buy');
+                const nodes = [];
+                verticals.forEach(v => {
+                  nodes.push(
+                    <Link key={v._id} href={`/${v.slug}`}
+                      onClick={() => setMoreOpen(false)}
+                      className="relative group py-1 uppercase text-[#f2eee2]"
+                    >
+                      {v.name}
+                      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
+                    </Link>
+                  );
+                  if (v.slug === 'what-to-buy') {
+                    nodes.push(
+                      <Link key="listicles" href="/picks"
+                        onClick={() => setMoreOpen(false)}
+                        className="relative group py-1 uppercase text-[#f2eee2]"
+                      >
+                        Listicles
+                        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
+                      </Link>
+                    );
+                  }
+                });
+                if (!hasWhatToBuy) {
+                  nodes.push(
+                    <Link key="listicles" href="/picks"
+                      onClick={() => setMoreOpen(false)}
+                      className="relative group py-1 uppercase text-[#f2eee2]"
+                    >
+                      Listicles
+                      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--green)] transition-all duration-300 group-hover:w-full"></span>
+                    </Link>
+                  );
+                }
+                return nodes;
+              })()}
             </div>
           </div>
         </div>
@@ -259,14 +318,41 @@ export default function Navbar({ verticals = [] }) {
           </div>
 
           <div className="flex flex-col space-y-6 text-lg font-medium overflow-y-auto">
-            {verticals.map(v => (
-                      <Link key={v._id} href={`/${v.slug}`}
-                className="uppercase text-[#f2eee2]"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {v.name}
-              </Link>
-            ))}
+            {(() => {
+              const hasWhatToBuy = verticals.some(v => v.slug === 'what-to-buy');
+              const nodes = [];
+              verticals.forEach(v => {
+                nodes.push(
+                  <Link key={v._id} href={`/${v.slug}`}
+                    className="uppercase text-[#f2eee2]"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {v.name}
+                  </Link>
+                );
+                if (v.slug === 'what-to-buy') {
+                  nodes.push(
+                    <Link key="listicles" href="/picks"
+                      className="uppercase text-[#f2eee2]"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Listicles
+                    </Link>
+                  );
+                }
+              });
+              if (!hasWhatToBuy) {
+                nodes.push(
+                  <Link key="listicles" href="/picks"
+                    className="uppercase text-[#f2eee2]"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Listicles
+                  </Link>
+                );
+              }
+              return nodes;
+            })()}
           </div>
 
           <div className="mt-auto pt-8 border-t border-[var(--bg-2)]/20 flex flex-col space-y-4">

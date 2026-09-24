@@ -37,3 +37,11 @@ create policy "picks_staff_write"
   on public.picks for all
   using (public.is_admin_or_editor())
   with check (public.is_admin_or_editor());
+
+
+
+
+
+
+  
+    
