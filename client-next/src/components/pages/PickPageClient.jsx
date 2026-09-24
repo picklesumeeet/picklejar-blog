@@ -83,7 +83,7 @@ export default function PickPageClient({ vertical, pick, morePosts, ads, formatt
                   {item.title}
                 </h2>
 
-                {item.image ? (
+                {item.image && (
                   <div className="w-full aspect-[16/9] mb-6 overflow-hidden rounded-sm border border-[var(--line)] bg-gray-100">
                     <Image
                       src={optimizeCloudinaryUrl(item.image, { width: 900, crop: 'fill' })}
@@ -92,10 +92,6 @@ export default function PickPageClient({ vertical, pick, morePosts, ads, formatt
                       height={506}
                       className="w-full h-full object-cover"
                     />
-                  </div>
-                ) : (
-                  <div className="w-full aspect-[16/9] mb-6 rounded-sm border-2 border-dashed border-[var(--gray-2)] bg-[var(--bg)] flex items-center justify-center text-[var(--gray-2)] font-bold text-xs tracking-widest uppercase">
-                    Image Placeholder — Item {i + 1}
                   </div>
                 )}
 
