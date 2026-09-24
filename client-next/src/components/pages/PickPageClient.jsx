@@ -8,6 +8,22 @@ import PostTitle from '@/components/shared/Typography/PostTitle';
 import { optimizeCloudinaryUrl } from '@/utils/optimizeCloudinaryUrl';
 import { renderInlineMarkdown } from '@/utils/renderInlineMarkdown';
 
+// Fallback house ads shown in listicle sidebar slots when the ads table
+// doesn't return an in-article ad. Full-image banners rendered via the
+// ArticleAdCard `imageOnly` branch (no CTA button, whole image links out).
+const FALLBACK_CHW_AD = {
+  imageOnly: true,
+  image: '/ads/chw.png',
+  altText: 'Choice Home Warranty',
+  ctaUrl: 'https://ratepickle.o18a.com/c?o=22006080&m=28014&a=747930&aff_click_id={replace_it}&sub_aff_id={replace_it}',
+};
+const FALLBACK_NDR_AD = {
+  imageOnly: true,
+  image: '/ads/ndr.png',
+  altText: 'National Debt Relief',
+  ctaUrl: 'https://ratepickle.o18a.com/c?o=22000134&m=28014&a=747930&aff_click_id={replace_it}&sub_aff_id={replace_it}',
+};
+
 export default function PickPageClient({ vertical, pick, morePosts, ads, formattedDate }) {
 
   return (
@@ -138,10 +154,10 @@ export default function PickPageClient({ vertical, pick, morePosts, ads, formatt
         <aside className="lg:col-span-4 relative">
           <div className="sticky top-4 flex flex-col">
             <div className="min-h-[400px]">
-              <ArticleAdCard ad={ads[0]} />
+              <ArticleAdCard ad={ads[0] || FALLBACK_CHW_AD} />
             </div>
             <div className="min-h-[400px]">
-              <ArticleAdCard ad={ads[1]} />
+              <ArticleAdCard ad={ads[1] || FALLBACK_NDR_AD} />
             </div>
           </div>
         </aside>
