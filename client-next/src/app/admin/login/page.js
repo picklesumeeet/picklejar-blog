@@ -39,8 +39,7 @@ export default function AdminLogin() {
       {/* Left Column - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-[var(--bg-2)] border-r border-[var(--line)] flex-col items-center justify-center p-12">
         <div className="w-full max-w-md">
-          {/* Placeholder for real image asset */}
-          <Image src="https://via.placeholder.com/800x600.png?text=WalletPickle+Brand+Image" alt="WalletPickle Brand" width={800} height={600} className="w-full h-auto object-contain rounded-lg shadow-sm" />
+          <Image src="/logo.png" alt="WalletPickle" width={1389} height={1132} priority className="w-full h-auto object-contain" />
         </div>
       </div>
 
@@ -48,7 +47,7 @@ export default function AdminLogin() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="text-center lg:hidden mb-8">
-            <Image src="https://via.placeholder.com/400x200.png?text=Brand" alt="WalletPickle" width={400} height={200} className="mx-auto h-16 w-auto object-contain" />
+            <Image src="/logo.png" alt="WalletPickle" width={1389} height={1132} priority className="mx-auto h-16 w-auto object-contain" />
           </div>
 
           <h1 className="text-3xl font-bold text-center mb-8 font-heading text-[var(--ink)]">
