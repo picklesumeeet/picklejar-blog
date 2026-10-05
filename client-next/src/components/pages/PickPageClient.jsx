@@ -90,6 +90,30 @@ export default function PickPageClient({ vertical, pick, morePosts, ads, formatt
             ))}
           </div>
 
+          {/* INTRO CTA — optional, editor-controlled */}
+          {pick.introCta && (
+            <aside className="mb-14 border border-[var(--line)] border-l-4 border-l-[var(--green)] bg-[var(--bg-2)]/50 rounded-md p-6 md:p-7 font-sans">
+              <h3 className="text-xl md:text-2xl font-bold text-[var(--ink)] mb-2 leading-snug">
+                {pick.introCta.heading}
+              </h3>
+              {pick.introCta.body && (
+                <p className="text-base md:text-lg text-[var(--ink-2)] leading-relaxed mb-5">
+                  {renderInlineMarkdown(pick.introCta.body)}
+                </p>
+              )}
+              {pick.introCta.buttonLabel && pick.introCta.buttonUrl && (
+                <a
+                  href={pick.introCta.buttonUrl}
+                  target="_blank"
+                  rel="sponsored noreferrer"
+                  className="inline-flex items-center gap-2 bg-[var(--green)] hover:bg-[var(--green-dark)] text-white font-bold text-sm md:text-base px-5 py-2.5 rounded-md transition-colors shadow-sm"
+                >
+                  {pick.introCta.buttonLabel}
+                </a>
+              )}
+            </aside>
+          )}
+
           {/* NUMBERED ITEMS */}
           <ol className="list-none p-0 m-0">
             {pick.items.map((item, i) => (

@@ -8,7 +8,7 @@ import { optimizeCloudinaryUrl } from '@/utils/optimizeCloudinaryUrl';
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
 const PICK_LIST_SELECT = 'id, title, slug, status, hero_image, publish_date, created_at, updated_at, vertical:verticals!primary_vertical_id(id, name, slug)';
-const PICK_FULL_SELECT = 'id, title, slug, excerpt, author, hero_image, disclosure, read_time, primary_vertical_id, intro, items, status, publish_date, created_at, updated_at, vertical:verticals!primary_vertical_id(id, name, slug)';
+const PICK_FULL_SELECT = 'id, title, slug, excerpt, author, hero_image, disclosure, read_time, primary_vertical_id, intro, intro_cta, items, status, publish_date, created_at, updated_at, vertical:verticals!primary_vertical_id(id, name, slug)';
 
 function slugify(name) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -40,6 +40,7 @@ export default function ManagePicks() {
     readTime: 8,
     primaryVerticalId: '',
     intro: [''],
+    introCta: null,
     items: [emptyItem()],
     status: 'draft',
   };
@@ -115,6 +116,7 @@ export default function ManagePicks() {
         readTime: full.readTime || 8,
         primaryVerticalId: full.primaryVerticalId || '',
         intro: full.intro?.length ? full.intro : [''],
+        introCta: full.introCta || null,
         items: full.items?.length ? full.items.map(normalizeItem) : [emptyItem()],
         status: full.status,
       });
@@ -153,6 +155,17 @@ export default function ManagePicks() {
   };
   const addIntroParagraph = () => setFormData(prev => ({ ...prev, intro: [...prev.intro, ''] }));
   const removeIntroParagraph = (i) => setFormData(prev => ({ ...prev, intro: prev.intro.filter((_, idx) => idx !== i) }));
+
+  // --- intro CTA helpers ---
+  const toggleIntroCta = (enabled) => {
+    setFormData(prev => ({
+      ...prev,
+      introCta: enabled ? { heading: '', body: '', buttonLabel: '', buttonUrl: '' } : null,
+    }));
+  };
+  const updateIntroCta = (patch) => {
+    setFormData(prev => ({ ...prev, introCta: { ...(prev.introCta || {}), ...patch } }));
+  };
 
   // --- item helpers ---
   const updateItem = (i, patch) => {
@@ -230,6 +243,17 @@ export default function ManagePicks() {
 
       const cleanedIntro = formData.intro.map(p => p.trim()).filter(Boolean);
 
+      // Intro CTA — require heading at minimum; drop entirely if blank.
+      const rawCta = formData.introCta;
+      const cleanedIntroCta = rawCta && (rawCta.heading || '').trim()
+        ? {
+            heading: (rawCta.heading || '').trim(),
+            body: (rawCta.body || '').trim(),
+            buttonLabel: (rawCta.buttonLabel || '').trim(),
+            buttonUrl: (rawCta.buttonUrl || '').trim(),
+          }
+        : null;
+
       const basePayload = {
         title: formData.title.trim(),
         excerpt: formData.excerpt || null,
@@ -239,6 +263,7 @@ export default function ManagePicks() {
         read_time: Number(formData.readTime) || null,
         primary_vertical_id: formData.primaryVerticalId || null,
         intro: cleanedIntro,
+        intro_cta: cleanedIntroCta,
         items: cleanedItems,
         status: formData.status,
         publish_date: publishDate,
@@ -359,6 +384,67 @@ export default function ManagePicks() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Intro CTA box — optional, shown after intro paragraphs */}
+          <div className="bg-[var(--bg)] p-4 rounded-lg border border-[var(--line)]">
+            <label className="flex items-center gap-2 text-sm font-semibold text-[var(--ink-2)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!formData.introCta}
+                onChange={e => toggleIntroCta(e.target.checked)}
+                className="w-4 h-4 accent-[var(--green)]"
+              />
+              Add CTA box after intro (before Section 1)
+            </label>
+            <p className="text-xs text-[var(--gray)] mt-1 ml-6">
+              Subtle call-to-action to test affiliate placement before readers scroll into the list.
+            </p>
+            {formData.introCta && (
+              <div className="mt-4 space-y-3 pl-6">
+                <div>
+                  <label className="block mb-1 text-xs font-semibold text-[var(--ink-2)]">Heading</label>
+                  <input
+                    type="text"
+                    className={inputCls}
+                    value={formData.introCta.heading || ''}
+                    onChange={e => updateIntroCta({ heading: e.target.value })}
+                    placeholder="Thinking About When to Claim?"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-xs font-semibold text-[var(--ink-2)]">Body (markdown supported)</label>
+                  <textarea
+                    className={`${inputCls} h-20`}
+                    value={formData.introCta.body || ''}
+                    onChange={e => updateIntroCta({ body: e.target.value })}
+                    placeholder="See your options and get help understanding what claiming at different ages could mean for your retirement."
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block mb-1 text-xs font-semibold text-[var(--ink-2)]">Button Label</label>
+                    <input
+                      type="text"
+                      className={inputCls}
+                      value={formData.introCta.buttonLabel || ''}
+                      onChange={e => updateIntroCta({ buttonLabel: e.target.value })}
+                      placeholder="Explore Your Options →"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-xs font-semibold text-[var(--ink-2)]">Button URL</label>
+                    <input
+                      type="text"
+                      className={inputCls}
+                      value={formData.introCta.buttonUrl || ''}
+                      onChange={e => updateIntroCta({ buttonUrl: e.target.value })}
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Items */}

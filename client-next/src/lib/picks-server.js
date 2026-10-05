@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { mapPost, mapAd, mapPick } from '@/lib/supabase/mappers';
 
 const POST_SELECT = 'id, title, slug, excerpt, banner_image, publish_date, status, editors_pick, created_at, updated_at, vertical:verticals(id, name, slug)';
-const PICK_SELECT = 'id, title, slug, excerpt, author, hero_image, disclosure, read_time, primary_vertical_id, intro, items, status, publish_date, created_at, updated_at, vertical:verticals!primary_vertical_id(id, name, slug, active)';
+const PICK_SELECT = 'id, title, slug, excerpt, author, hero_image, disclosure, read_time, primary_vertical_id, intro, intro_cta, items, status, publish_date, created_at, updated_at, vertical:verticals!primary_vertical_id(id, name, slug, active)';
 
 function formatDate(publishDate) {
   const d = publishDate ? new Date(publishDate) : new Date();

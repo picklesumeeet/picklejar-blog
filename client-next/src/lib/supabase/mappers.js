@@ -71,6 +71,7 @@ export function mapPick(p) {
     primaryVerticalSlug: p.vertical?.slug ?? null,
     vertical: p.vertical ? mapVertical(p.vertical) : null,
     intro: Array.isArray(p.intro) ? p.intro : [],
+    introCta: p.intro_cta && p.intro_cta.heading ? p.intro_cta : null,
     items: Array.isArray(p.items) ? p.items : [],
     status: p.status,
     publishDate: p.publish_date,
