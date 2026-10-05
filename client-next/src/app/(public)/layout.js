@@ -1,7 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Ticker from "@/components/layout/Ticker";
-import TopAdBanner from "@/components/ads/TopAdBanner";
+import TopNewsletterBanner from "@/components/newsletter/TopNewsletterBanner";
 import { createClient } from "@/lib/supabase/server";
 import { mapVertical } from "@/lib/supabase/mappers";
 
@@ -26,7 +26,7 @@ export default async function PublicLayout({ children }) {
 
   return (
     <>
-      <TopAdBanner />
+      <TopNewsletterBanner />
       <Navbar verticals={verticals} />
       <Ticker />
       {children}
