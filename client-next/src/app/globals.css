@@ -55,3 +55,16 @@
   opacity: 1 !important;
   visibility: visible !important;
 }
+
+/* Match listicle link styling for post bodies rendered by EditorJsRenderer. */
+.editor-content a {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 150ms ease;
+}
+
+.editor-content a:hover {
+  color: var(--green-dark);
+}
