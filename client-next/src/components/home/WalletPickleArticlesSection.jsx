@@ -10,7 +10,7 @@ export default function WalletPickleArticlesSection({ posts = [], totalCount = 0
 
   // Homepage shows the first page only; downstream pages live at /articles?page=N.
   // Compute the "fake" chip row to hint at how much more content exists.
-  const perPage = 10;
+  const perPage = 15;
   const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
   const previewPages = Array.from({ length: Math.min(4, totalPages) }, (_, i) => i + 1);
 

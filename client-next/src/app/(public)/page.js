@@ -63,7 +63,7 @@ async function getHomeData() {
     supabase.from('posts').select(POST_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(15),
     supabase.from('posts').select(POST_SELECT).eq('status', 'published').eq('editors_pick', true).order('publish_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(5),
     supabase.from('posts').select('id', { count: 'exact', head: true }).eq('status', 'published'),
-    supabase.from('posts').select(POST_SELECT).eq('status', 'published').order('publish_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(10),
+    supabase.from('posts').select(POST_SELECT).eq('status', 'published').order('publish_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(15),
   ]);
 
   const allVerticals = (verticalsRes.data ?? []).map(mapVertical);
