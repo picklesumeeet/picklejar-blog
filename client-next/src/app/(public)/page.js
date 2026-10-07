@@ -4,6 +4,9 @@ import FeaturedVerticalSection from '@/components/home/FeaturedVerticalSection';
 import MoreStoriesSection from '@/components/home/MoreStoriesSection';
 import SectionDividerAd from '@/components/ads/SectionDividerAd';
 import SportsSection from '@/components/home/SportsSection';
+import FinanceSection from '@/components/home/FinanceSection';
+import EditorsPickSidebar from '@/components/home/EditorsPickSidebar';
+import WalletPickleArticlesSection from '@/components/home/WalletPickleArticlesSection';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { mapPost, mapVertical, mapAd, mapPetition } from '@/lib/supabase/mappers';
@@ -48,6 +51,9 @@ async function getHomeData() {
     sidebarAdRes,
     dividerAdRes,
     latestPostsRes,
+    editorsPickRes,
+    articlesCountRes,
+    articlesPageRes,
   ] = await Promise.all([
     supabase.from('trending_snapshots').select('post_ids').order('computed_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('verticals').select('*').eq('active', true).order('featured_order').order('created_at', { ascending: false }),
@@ -55,13 +61,22 @@ async function getHomeData() {
     supabase.from('ads').select('*').eq('placement', 'sidebar').eq('active', true).order('created_at', { ascending: false }).limit(1),
     supabase.from('ads').select('*').eq('placement', 'section_divider').eq('active', true).order('created_at', { ascending: false }).limit(1),
     supabase.from('posts').select(POST_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(15),
+    supabase.from('posts').select(POST_SELECT).eq('status', 'published').eq('editors_pick', true).order('publish_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(5),
+    supabase.from('posts').select('id', { count: 'exact', head: true }).eq('status', 'published'),
+    supabase.from('posts').select(POST_SELECT).eq('status', 'published').order('publish_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(10),
   ]);
 
   const allVerticals = (verticalsRes.data ?? []).map(mapVertical);
+  const financeVerticalIds = allVerticals
+    .filter(v => ['make-money', 'save-money', 'budget-money'].includes(v.slug))
+    .map(v => v._id);
   const sportsPetitions = (petitionsRes.data ?? []).map(mapPetition);
   const sidebarAd = sidebarAdRes.data?.[0] ? mapAd(sidebarAdRes.data[0]) : null;
   const dividerAd = dividerAdRes.data?.[0] ? mapAd(dividerAdRes.data[0]) : null;
   const latestPosts = (latestPostsRes.data ?? []).map(mapPost);
+  const editorsPicks = (editorsPickRes.data ?? []).map(mapPost);
+  const articlesTotalCount = articlesCountRes.count ?? 0;
+  const articlesPageOne = (articlesPageRes.data ?? []).map(mapPost);
 
   // Trending: hydrate the snapshot's post_ids array with actual post rows.
   // Falls back to latest posts if no snapshot exists yet (before cron runs).
@@ -94,7 +109,7 @@ async function getHomeData() {
   const targetVertA   = featuredVerticals.find(v => v.featuredOrder === 3) ?? null;
 
   // Fetch per-vertical posts in parallel.
-  const [heroPostsRes, vertSecPostsRes, vertAPostsRes, sportsPostsRes] = await Promise.all([
+  const [heroPostsRes, vertSecPostsRes, vertAPostsRes, sportsPostsRes, financePostsRes] = await Promise.all([
     targetHeroVert
       ? supabase.from('posts').select(POST_SELECT).eq('status', 'published').eq('vertical_id', targetHeroVert._id).order('created_at', { ascending: false }).limit(9)
       : Promise.resolve({ data: [] }),
@@ -107,6 +122,9 @@ async function getHomeData() {
     sportsVertical
       ? supabase.from('posts').select(POST_SELECT).eq('status', 'published').eq('vertical_id', sportsVertical._id).order('created_at', { ascending: false }).limit(7)
       : Promise.resolve({ data: [] }),
+    financeVerticalIds.length > 0
+      ? supabase.from('posts').select(POST_SELECT).eq('status', 'published').in('vertical_id', financeVerticalIds).order('publish_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(11)
+      : Promise.resolve({ data: [] }),
   ]);
 
   return {
@@ -118,6 +136,11 @@ async function getHomeData() {
     sports: sportsVertical
       ? { vertical: sportsVertical, posts: (sportsPostsRes.data ?? []).map(mapPost), petitions: sportsPetitions }
       : null,
+    finance: financeVerticalIds.length > 0
+      ? { posts: (financePostsRes.data ?? []).map(mapPost) }
+      : null,
+    editorsPicks,
+    articles: { posts: articlesPageOne, totalCount: articlesTotalCount },
     ads: { sidebar: sidebarAd, sectionDivider: dividerAd },
   };
 }
@@ -172,7 +195,15 @@ export default async function HomePage() {
         </div>
       </div>
 
+      <FinanceSection data={homeData.finance} />
       <SportsSection data={homeData.sports} />
+
+      <div className="flex flex-col lg:flex-row gap-10">
+        <div className="flex-1 w-full min-w-0">
+          <WalletPickleArticlesSection posts={homeData.articles.posts} totalCount={homeData.articles.totalCount} />
+        </div>
+        <EditorsPickSidebar posts={homeData.editorsPicks} />
+      </div>
     </div>
   );
 }
