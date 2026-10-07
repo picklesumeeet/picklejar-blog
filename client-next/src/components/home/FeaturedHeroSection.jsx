@@ -89,10 +89,15 @@ export default function FeaturedHeroSection({ data }) {
 
       </div>
 
-      {/* BOTTOM GRID ROW: 4 articles */}
+      {/* BOTTOM GRID ROW: up to 4 articles; grid cols collapse to actual count. */}
       {bottomGridPosts.length > 0 && (
         <div className="pt-8 border-t border-dashed border-[var(--line)] mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${
+            bottomGridPosts.length === 1 ? 'lg:grid-cols-1' :
+            bottomGridPosts.length === 2 ? 'lg:grid-cols-2' :
+            bottomGridPosts.length === 3 ? 'lg:grid-cols-3' :
+            'lg:grid-cols-4'
+          }`}>
             {bottomGridPosts.map(post => (
               <Link key={post._id} href={getSlug(post)} 
                 className="group block transition-all duration-200 ease-in-out hover:bg-gray-50 hover:shadow-md hover:scale-[1.01] rounded-xl p-3 -mx-3"
